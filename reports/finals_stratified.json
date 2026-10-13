@@ -1,0 +1,394 @@
+{
+  "seeds": 30,
+  "generations": 250,
+  "ladders": [
+    "高起始 [6,8,10,12,14,17,21]",
+    "低起始 [4,5,6,7,8,9,11]"
+  ],
+  "fields": {
+    "A 触发家族分层": {
+      "members": [
+        "R1-1",
+        "P1-1",
+        "B1-3",
+        "K1-2",
+        "H2-1",
+        "RC1-1",
+        "F1-1+RC1-1"
+      ],
+      "rows": [
+        {
+          "encoding": "R1-1",
+          "mean_share": 0.176,
+          "mean_final": 0.1525,
+          "survival": 0.767,
+          "dominance": 0.5,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "P1-1",
+          "mean_share": 0.02712,
+          "mean_final": 0.02283,
+          "survival": 0.417,
+          "dominance": 0.083,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "SM",
+          "mean_share": 0.15066,
+          "mean_final": 0.09183,
+          "survival": 0.4,
+          "dominance": 1.0,
+          "worst_share": 0.0,
+          "is_filler": true
+        },
+        {
+          "encoding": "F1-1+RC1-1",
+          "mean_share": 0.01147,
+          "mean_final": 0.00617,
+          "survival": 0.117,
+          "dominance": 0.5,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "S0",
+          "mean_share": 0.00067,
+          "mean_final": 0.00067,
+          "survival": 0.017,
+          "dominance": 0.0,
+          "worst_share": 0.0,
+          "is_filler": true
+        },
+        {
+          "encoding": "B1-3",
+          "mean_share": 0.00019,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.067,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "K1-2",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.067,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "H2-1",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.083,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "RC1-1",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.133,
+          "worst_share": 0.0,
+          "is_filler": false
+        }
+      ],
+      "welfare": 2.5822,
+      "diversity": 1.5844
+    },
+    "B 默认槽分层": {
+      "members": [
+        "S1",
+        "F2-3",
+        "T1-2",
+        "D0",
+        "AD1",
+        "W",
+        "BS3"
+      ],
+      "rows": [
+        {
+          "encoding": "SM",
+          "mean_share": 0.16921,
+          "mean_final": 0.1085,
+          "survival": 0.35,
+          "dominance": 1.0,
+          "worst_share": 0.0,
+          "is_filler": true
+        },
+        {
+          "encoding": "D0",
+          "mean_share": 0.02543,
+          "mean_final": 0.01833,
+          "survival": 0.283,
+          "dominance": 0.283,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "F2-3",
+          "mean_share": 0.01062,
+          "mean_final": 0.00783,
+          "survival": 0.1,
+          "dominance": 0.117,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "W",
+          "mean_share": 0.00659,
+          "mean_final": 0.00883,
+          "survival": 0.017,
+          "dominance": 0.183,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "T1-2",
+          "mean_share": 0.00067,
+          "mean_final": 0.00067,
+          "survival": 0.017,
+          "dominance": 0.067,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "S1",
+          "mean_share": 0.00113,
+          "mean_final": 0.00083,
+          "survival": 0.0,
+          "dominance": 0.067,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "BS3",
+          "mean_share": 0.00035,
+          "mean_final": 0.00083,
+          "survival": 0.0,
+          "dominance": 0.5,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "AD1",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.133,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "S0",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.0,
+          "worst_share": 0.0,
+          "is_filler": true
+        }
+      ],
+      "welfare": 2.4947,
+      "diversity": 1.5521
+    },
+    "C 纯随机基线": {
+      "members": [
+        "D1+RC3-2+C3",
+        "S1+P2-M+R3-M+C2",
+        "S1+RC2-2+B3-M+M1",
+        "S2+RC1-1+C3",
+        "BS3+H2-M+C2",
+        "S1+B3-3+B2-2+M3",
+        "F1-1+B3-2+C2"
+      ],
+      "rows": [
+        {
+          "encoding": "SM",
+          "mean_share": 0.17069,
+          "mean_final": 0.08,
+          "survival": 0.217,
+          "dominance": 1.0,
+          "worst_share": 0.0,
+          "is_filler": true
+        },
+        {
+          "encoding": "S1+P2-M+R3-M+C2",
+          "mean_share": 0.00446,
+          "mean_final": 0.0045,
+          "survival": 0.067,
+          "dominance": 0.133,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "BS3+H2-M+C2",
+          "mean_share": 0.00083,
+          "mean_final": 0.00083,
+          "survival": 0.017,
+          "dominance": 0.183,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "F1-1+B3-2+C2",
+          "mean_share": 1e-05,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.5,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "D1+RC3-2+C3",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.083,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "S1+RC2-2+B3-M+M1",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.067,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "S2+RC1-1+C3",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.067,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "S1+B3-3+B2-2+M3",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.15,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "S0",
+          "mean_share": 0.0,
+          "mean_final": 0.0,
+          "survival": 0.0,
+          "dominance": 0.0,
+          "worst_share": 0.0,
+          "is_filler": true
+        }
+      ],
+      "welfare": 2.5174,
+      "diversity": 1.2836
+    },
+    "D 搜索冠军": {
+      "members": [
+        "R1-2",
+        "R1-1+RPT1-M",
+        "D0+R1-1+RPT1-1",
+        "D0+R1-1+C2",
+        "R1-3",
+        "R1-1",
+        "D0+R1-1"
+      ],
+      "rows": [
+        {
+          "encoding": "S0",
+          "mean_share": 0.08153,
+          "mean_final": 0.07667,
+          "survival": 1.0,
+          "dominance": 0.683,
+          "worst_share": 0.04921,
+          "is_filler": true
+        },
+        {
+          "encoding": "R1-1",
+          "mean_share": 0.07516,
+          "mean_final": 0.07317,
+          "survival": 1.0,
+          "dominance": 0.5,
+          "worst_share": 0.04,
+          "is_filler": false
+        },
+        {
+          "encoding": "R1-1+RPT1-M",
+          "mean_share": 0.06543,
+          "mean_final": 0.062,
+          "survival": 1.0,
+          "dominance": 0.3,
+          "worst_share": 0.04,
+          "is_filler": false
+        },
+        {
+          "encoding": "D0+R1-1+RPT1-1",
+          "mean_share": 0.06563,
+          "mean_final": 0.06317,
+          "survival": 0.983,
+          "dominance": 0.417,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "R1-3",
+          "mean_share": 0.06575,
+          "mean_final": 0.06317,
+          "survival": 0.967,
+          "dominance": 0.25,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "R1-2",
+          "mean_share": 0.06532,
+          "mean_final": 0.06167,
+          "survival": 0.967,
+          "dominance": 0.25,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "D0+R1-1+C2",
+          "mean_share": 0.04627,
+          "mean_final": 0.04367,
+          "survival": 0.917,
+          "dominance": 0.083,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "D0+R1-1",
+          "mean_share": 0.05484,
+          "mean_final": 0.05283,
+          "survival": 0.633,
+          "dominance": 0.55,
+          "worst_share": 0.0,
+          "is_filler": false
+        },
+        {
+          "encoding": "SM",
+          "mean_share": 0.00217,
+          "mean_final": 0.0015,
+          "survival": 0.033,
+          "dominance": 0.0,
+          "worst_share": 0.0,
+          "is_filler": true
+        }
+      ],
+      "welfare": 2.9004,
+      "diversity": 2.6883
+    }
+  }
+}

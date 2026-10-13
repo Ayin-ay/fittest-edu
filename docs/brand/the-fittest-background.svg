@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1200" width="1600" height="1200" role="img" aria-label="The Fittest 游戏图层底纹：收益矩阵">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FDFAF5"/>
+      <stop offset="55%" stop-color="#FBF7F0"/>
+      <stop offset="100%" stop-color="#F7F1E7"/>
+    </linearGradient>
+    <radialGradient id="wash-coop" cx="0.14" cy="0.12" r="0.60">
+      <stop offset="0%" stop-color="#2E7DE4" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#2E7DE4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wash-defect" cx="0.90" cy="0.24" r="0.58">
+      <stop offset="0%" stop-color="#E4572E" stop-opacity="0.045"/>
+      <stop offset="100%" stop-color="#E4572E" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wash-mutual" cx="0.30" cy="0.94" r="0.68">
+      <stop offset="0%" stop-color="#21A179" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#21A179" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#paper)"/>
+  <rect width="1600" height="1200" fill="url(#wash-coop)"/>
+  <rect width="1600" height="1200" fill="url(#wash-defect)"/>
+  <rect width="1600" height="1200" fill="url(#wash-mutual)"/>
+
+  <!-- The payoff matrix, evenly spaced. No border strips: those were
+       what doubled up when the sheet repeated. -->
+  <g opacity="0.035">
+    <g transform="translate(170,170)"><rect width="88" height="88" rx="15" fill="none" stroke="#21A179" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#21A179">C</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#21A179">3</text></g><g transform="translate(510,170)"><rect width="88" height="88" rx="15" fill="none" stroke="#E4572E" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#E4572E">D</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#E4572E">5</text></g><g transform="translate(850,170)"><rect width="88" height="88" rx="15" fill="none" stroke="#2E7DE4" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#2E7DE4">C</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#2E7DE4">0</text></g><g transform="translate(1190,170)"><rect width="88" height="88" rx="15" fill="none" stroke="#6B6156" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#6B6156">D</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#6B6156">1</text></g><g transform="translate(170,510)"><rect width="88" height="88" rx="15" fill="none" stroke="#E4572E" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#E4572E">D</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#E4572E">5</text></g><g transform="translate(510,510)"><rect width="88" height="88" rx="15" fill="none" stroke="#2E7DE4" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#2E7DE4">C</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#2E7DE4">0</text></g><g transform="translate(850,510)"><rect width="88" height="88" rx="15" fill="none" stroke="#6B6156" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#6B6156">D</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#6B6156">1</text></g><g transform="translate(1190,510)"><rect width="88" height="88" rx="15" fill="none" stroke="#21A179" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#21A179">C</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#21A179">3</text></g><g transform="translate(170,850)"><rect width="88" height="88" rx="15" fill="none" stroke="#2E7DE4" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#2E7DE4">C</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#2E7DE4">0</text></g><g transform="translate(510,850)"><rect width="88" height="88" rx="15" fill="none" stroke="#6B6156" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#6B6156">D</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#6B6156">1</text></g><g transform="translate(850,850)"><rect width="88" height="88" rx="15" fill="none" stroke="#21A179" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#21A179">C</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#21A179">3</text></g><g transform="translate(1190,850)"><rect width="88" height="88" rx="15" fill="none" stroke="#E4572E" stroke-width="2"/><text x="44.0" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="27" fill="#E4572E">D</text><text x="44.0" y="70" text-anchor="middle" font-family="Georgia,serif" font-size="23" fill="#E4572E">5</text></g>
+  </g>
+</svg>

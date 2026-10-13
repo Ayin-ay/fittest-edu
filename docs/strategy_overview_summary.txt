@@ -1,0 +1,141 @@
+项目中已存在的策略总览
+
+该项目中，囚徒困境的策略并不止一种版本：
+- 简单演化版：见 simulations/strategy_evolution_trends.py
+- 对阵分析版：见 matchup_analysis/strategy_matchup_analysis.py
+- 说明文档：README.md 中只列出了一部分常见策略
+
+一、核心策略（README 与简单演化版中出现）
+1. TFT（Tit for Tat / 以牙还牙）
+   - 行为：首轮合作；之后始终模仿对手上一回合的动作。
+   - 优点：稳定、容易建立合作，适合长期重复博弈。
+   - 代码：simulations/strategy_evolution_trends.py 中的 TFT；matchup_analysis/strategy_matchup_analysis.py 中也存在同名策略。
+
+2. ALLD（Always Defect / 永远背叛）
+   - 行为：始终选择背叛。
+   - 特点：短期收益高，但长期容易被惩罚，破坏合作均衡。
+
+3. ALLC（Always Cooperate / 永远合作）
+   - 行为：始终选择合作。
+   - 特点：容易被利用，但在完全合作环境中表现稳定。
+
+4. Grudger（记仇策略）
+   - 行为：初始合作；一旦对手曾经背叛过，就永久选择背叛。
+   - 特点：强惩罚型，适合对付长期背叛者。
+
+5. Detective（侦探型策略）
+   - 行为：前 4 轮按 C, D, C, C 的序列出手；如果发现对手背叛，则转向“以牙还牙”式反制；否则保持持续背叛。
+   - 特点：既有试探，也有报复。
+
+6. Random（随机策略）
+   - 行为：每轮随机决定合作或背叛。
+   - 特点：无固定模式，表现不可预测。
+
+二、对阵分析版 matchup_analysis/strategy_matchup_analysis.py 中的完整策略列表
+以下是项目代码中实际定义的全部策略（按 Strategy 枚举）：
+
+1. TFT
+   - 先合作，之后复制对手上一回合动作。
+
+2. ALLD
+   - 永远背叛。
+
+3. ALLC
+   - 永远合作。
+
+4. GRUDGER
+   - 只要对手出现过一次背叛，就永久背叛。
+
+5. CHAOS
+   - 每轮随机选择合作或背叛。
+
+6. PAVLOV
+   - 也叫“赢了保持，输了翻转”（Win-Stay, Lose-Shift）。
+   - 如果上一轮结果是“有利于自己”，保持上一动作；否则翻转。
+
+7. FORGIVING_TFT
+   - 对于短期误判有宽容：若最近两轮中任一轮对手合作，则接受修复；只有连续两次背叛时才反击。
+   - 本质是带宽容的以牙还牙。
+
+8. TESTER
+   - 先试探性背叛一次，再看对手反应；若对方报复，则转为对其上一回合动作做出对应回应；否则继续施压或选择背叛。
+
+9. MAJORITY
+   - 根据对手历史中“合作”与“背叛”的多数情况做出选择。
+
+10. BACKSTABBER
+   - 前期复制对手；当接近比赛结束时，突然背叛以最大化最后收益。
+   - 属于“后期出卖”的策略。
+
+11. HYENA
+   - 具有随机触发的背叛倾向；一旦进入“触发状态”，会持续制造破坏。
+   - 典型特征：偶尔诱导对手信任，但随后突然背叛。
+
+12. PROVOCATEUR
+   - 初期先背叛，再根据对手上一轮动作做出回应。
+   - 特点：制造冲突后再跟随对方反应。
+
+13. ALTERNATOR
+   - 固定交替合作与背叛：C, D, C, D, ...
+   - 预测性强，但容易被对手利用。
+
+14. TROUBLEMAKER
+   - 每轮都做与对手上一回合相反的动作。
+   - 目的是制造对抗和不稳定性。
+
+15. FATHER
+   - 如果对手曾经背叛过至少两次，则选择背叛；否则继续合作。
+   - 属于“有条件的守护/惩罚型”策略。
+
+16. GAMBLER
+   - 以概率随机选择：40% 复制对手上一动作，30% 背叛，30% 合作。
+   - 属于混合型随机策略。
+
+17. REVENGE
+   - 若对手最近一轮背叛，则触发“复仇状态”，后续两轮强制背叛；否则模仿对手上一回合动作。
+   - 属于短期强制报复型。
+
+三、项目中的策略分布特征
+从代码结构看，项目并不是只有单一的“最优策略”，而是把多个经典与变体策略放在同一生态系统中进行进化和对战。
+
+其中，最核心的一组是：
+- TFT
+- ALLD
+- ALLC
+- GRUDGER
+- CHAOS
+- PAVLOV
+- FORGIVING_TFT
+- TESTER
+- MAJORITY
+
+而更复杂的扩展型策略包括：
+- Detective
+- Random
+- BACKSTABBER
+- HYENA
+- PROVOCATEUR
+- ALTERNATOR
+- TROUBLEMAKER
+- FATHER
+- GAMBLER
+- REVENGE
+
+这些策略覆盖了几类常见博弈思路：
+- 纯合作型：ALLC
+- 纯背叛型：ALLD
+- 复制型：TFT、FORGIVING_TFT、PAVLOV
+- 惩罚型：GRUDGER、TESTER、REVENGE、FATHER
+- 随机型：CHAOS、Random、GAMBLER
+- 试探型：Detective、PROVOCATEUR、TESTER
+- 反制型：TROUBLEMAKER、ALTERNATOR、HYENA
+- 终局压制型：BACKSTABBER
+
+四、结论
+项目中的“策略”并不是单一的标准答案，而是一套囚徒困境中的行为基因库：
+- 有利于稳定合作的策略：TFT、FORGIVING_TFT、PAVLOV
+- 有利于短期收益的策略：ALLD、BACKSTABBER、HYENA
+- 适合探索演化稳定性的策略：CHAOS、Random、GAMBLER
+- 适合博弈对抗测试的策略：Detective、Tester、Provocateur、Revenge
+
+也就是说，这个项目实际上是在构建一个“囚徒困境策略生态系统”，用于研究不同策略在重复博弈中如何相互竞争、演化和稳定。

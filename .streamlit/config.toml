@@ -1,0 +1,31 @@
+# The palette is the brand icon's: a non-transitive three-way cycle in
+# orange / blue / green. Coop-versus-defect is exactly such a cycle, so the
+# two action colours are taken from it and can no longer be confused with the
+# neutral chrome around them.
+# Warm paper ground rather than Streamlit's cold white. The accent colours are
+# the brand triad (cooperation blue, defection orange, mutual green) and are
+# kept in step with dashboard/theme.py, which owns the derived values.
+[theme]
+base = "light"
+primaryColor = "#2E7DE4"
+backgroundColor = "#FBF7F0"
+secondaryBackgroundColor = "#F5EFE4"
+textColor = "#241F1A"
+borderColor = "#E4DACA"
+baseRadius = "medium"
+font = "sans-serif"
+showWidgetBorder = true
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor = "#F5EFE4"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+showEmailPrompt = false
+# Serve files from ./static at app/static/<name>. Used to publish the app icon
+# on the app's own domain, because the GitHub repo is private and raw
+# URLs cannot serve it publicly.
+enableStaticServing = true

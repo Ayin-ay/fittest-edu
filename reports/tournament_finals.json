@@ -1,0 +1,388 @@
+{
+  "top": 7,
+  "seeds": 60,
+  "generations": 250,
+  "leaders": [
+    "R1-2",
+    "R1-1+RPT1-M",
+    "D0+R1-1+RPT1-1",
+    "D0+R1-1+C2",
+    "R1-3",
+    "R1-1",
+    "D0+R1-1"
+  ],
+  "fillers": [
+    "S0",
+    "SM"
+  ],
+  "configs": [
+    "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+    "高起始 [6, 8, 10, 12, 14, 17, 21]",
+    "低起始 [4, 5, 6, 7, 8, 9, 11]"
+  ],
+  "rows": [
+    {
+      "encoding": "S0",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.08244,
+      "mean_final": 0.07567,
+      "survival": 1.0,
+      "dominance": 0.7,
+      "worst_share": 0.04944,
+      "stdev": 0.017,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-1+RPT1-M",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.06522,
+      "mean_final": 0.06067,
+      "survival": 0.967,
+      "dominance": 0.433,
+      "worst_share": 0.0,
+      "stdev": 0.02353,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-2",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.06366,
+      "mean_final": 0.06167,
+      "survival": 0.95,
+      "dominance": 0.383,
+      "worst_share": 0.00341,
+      "stdev": 0.01801,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-3",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.06462,
+      "mean_final": 0.06033,
+      "survival": 0.933,
+      "dominance": 0.4,
+      "worst_share": 0.0,
+      "stdev": 0.01828,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1+RPT1-1",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.06634,
+      "mean_final": 0.062,
+      "survival": 0.917,
+      "dominance": 0.5,
+      "worst_share": 0.0,
+      "stdev": 0.02742,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.06966,
+      "mean_final": 0.06783,
+      "survival": 0.9,
+      "dominance": 0.617,
+      "worst_share": 0.0,
+      "stdev": 0.0215,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-1",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.07125,
+      "mean_final": 0.0675,
+      "survival": 0.867,
+      "dominance": 0.633,
+      "worst_share": 0.0,
+      "stdev": 0.02467,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1+C2",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.04553,
+      "mean_final": 0.0425,
+      "survival": 0.867,
+      "dominance": 0.133,
+      "worst_share": 0.0,
+      "stdev": 0.01348,
+      "runs": 60
+    },
+    {
+      "encoding": "SM",
+      "config": "基准阶梯 [4, 6, 8, 10, 12, 14, 20]",
+      "mean_share": 0.00285,
+      "mean_final": 0.00233,
+      "survival": 0.05,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "stdev": 0.01083,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-2",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.07412,
+      "mean_final": 0.076,
+      "survival": 1.0,
+      "dominance": 0.45,
+      "worst_share": 0.04,
+      "stdev": 0.01911,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-1",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.08677,
+      "mean_final": 0.08017,
+      "survival": 0.983,
+      "dominance": 0.8,
+      "worst_share": 0.04643,
+      "stdev": 0.02413,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-1+RPT1-M",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.06797,
+      "mean_final": 0.0645,
+      "survival": 0.983,
+      "dominance": 0.583,
+      "worst_share": 0.04,
+      "stdev": 0.01453,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-3",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.07503,
+      "mean_final": 0.07117,
+      "survival": 0.967,
+      "dominance": 0.533,
+      "worst_share": 0.04,
+      "stdev": 0.01553,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1+RPT1-1",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.06829,
+      "mean_final": 0.0655,
+      "survival": 0.967,
+      "dominance": 0.467,
+      "worst_share": 0.03,
+      "stdev": 0.01438,
+      "runs": 60
+    },
+    {
+      "encoding": "S0",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.07144,
+      "mean_final": 0.06567,
+      "survival": 0.95,
+      "dominance": 0.467,
+      "worst_share": 0.0,
+      "stdev": 0.01966,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1+C2",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.04867,
+      "mean_final": 0.0445,
+      "survival": 0.883,
+      "dominance": 0.133,
+      "worst_share": 0.0,
+      "stdev": 0.01395,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.02838,
+      "mean_final": 0.03067,
+      "survival": 0.283,
+      "dominance": 0.15,
+      "worst_share": 0.0,
+      "stdev": 0.03335,
+      "runs": 60
+    },
+    {
+      "encoding": "SM",
+      "config": "高起始 [6, 8, 10, 12, 14, 17, 21]",
+      "mean_share": 0.00925,
+      "mean_final": 0.00767,
+      "survival": 0.183,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "stdev": 0.01703,
+      "runs": 60
+    },
+    {
+      "encoding": "S0",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.08841,
+      "mean_final": 0.07383,
+      "survival": 0.967,
+      "dominance": 0.933,
+      "worst_share": 0.04905,
+      "stdev": 0.02605,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.0821,
+      "mean_final": 0.07533,
+      "survival": 0.967,
+      "dominance": 1.0,
+      "worst_share": 0.05024,
+      "stdev": 0.01613,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-1",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.06624,
+      "mean_final": 0.06267,
+      "survival": 0.967,
+      "dominance": 0.25,
+      "worst_share": 0.0,
+      "stdev": 0.01779,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-2",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.05948,
+      "mean_final": 0.0555,
+      "survival": 0.95,
+      "dominance": 0.083,
+      "worst_share": 0.03135,
+      "stdev": 0.01548,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-3",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.05992,
+      "mean_final": 0.05617,
+      "survival": 0.933,
+      "dominance": 0.2,
+      "worst_share": 0.0,
+      "stdev": 0.01792,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1+RPT1-1",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.05912,
+      "mean_final": 0.05583,
+      "survival": 0.933,
+      "dominance": 0.117,
+      "worst_share": 0.0,
+      "stdev": 0.02074,
+      "runs": 60
+    },
+    {
+      "encoding": "R1-1+RPT1-M",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.05725,
+      "mean_final": 0.05067,
+      "survival": 0.867,
+      "dominance": 0.233,
+      "worst_share": 0.00373,
+      "stdev": 0.01994,
+      "runs": 60
+    },
+    {
+      "encoding": "D0+R1-1+C2",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.04256,
+      "mean_final": 0.03833,
+      "survival": 0.75,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "stdev": 0.01598,
+      "runs": 60
+    },
+    {
+      "encoding": "SM",
+      "config": "低起始 [4, 5, 6, 7, 8, 9, 11]",
+      "mean_share": 0.0,
+      "mean_final": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "stdev": 0.0,
+      "runs": 60
+    }
+  ],
+  "rules": {
+    "population_capacity": 100,
+    "turns_per_match": 20,
+    "payoffs": {
+      "cooperate_cooperate": [
+        3.0,
+        3.0
+      ],
+      "cooperate_defect": [
+        0.0,
+        5.0
+      ],
+      "defect_cooperate": [
+        5.0,
+        0.0
+      ],
+      "defect_defect": [
+        1.0,
+        1.0
+      ]
+    },
+    "allocation": {
+      "ALPHA_ALLOCATE": 0.4,
+      "note": "下一代规模 = 当代规模 * (ALPHA_ALLOCATE + (1-ALPHA_ALLOCATE) * 适应度/平均适应度)"
+    },
+    "extinction": {
+      "EXTINCTION_SIZE": 3,
+      "EXTINCTION_STREAK": 3,
+      "EXTINCTION_FITNESS_RATIO": 0.5,
+      "note": "物种（亚种除外）规模不大于 EXTINCTION_SIZE 时淘汰；分配后与每代结束时各检查一次；连续 EXTINCTION_STREAK 代混合适应度低于平均值 EXTINCTION_FITNESS_RATIO 倍时淘汰"
+    },
+    "subspecies": {
+      "SUBSPECIES_MIN_SIZE": 10,
+      "SUBSPECIES_MIN_RATIO": 0.35,
+      "SUBSPECIES_EXTINCTION_STREAK": 3,
+      "SUBSPECIES_STALL_GENERATIONS": 10,
+      "ALPHA_INVASION": 0.4,
+      "note": "亚种达到规模或占比阈值之一即独立；连续低适应度达阈值则淘汰并归还规模；规模恒为 1 达 SUBSPECIES_STALL_GENERATIONS 代则淘汰"
+    },
+    "mutation": {
+      "MUTATION_MIN_SIZE": 10,
+      "MAX_MUTATION_ATTEMPTS": 4,
+      "MUTATION_WEIGHTS": {
+        "parameter": 25,
+        "jump": 8,
+        "replace": 15,
+        "add": 10,
+        "delete": 30,
+        "swap": 4,
+        "fresh": 4,
+        "inherit": 4
+      },
+      "probability_by_size": {
+        "<=10": 0.0,
+        "<=20": 0.05,
+        "<=40": 0.1,
+        "<=70": 0.15,
+        ">70": 0.2
+      }
+    },
+    "stagnation": {
+      "STAGNATION_SEATS": 2,
+      "STAGNATION_GENERATIONS": 20,
+      "note": "当一代内换手的席位不超过 STAGNATION_SEATS 时累计静止计数，达到 STAGNATION_GENERATIONS 则按规模加权强制一次变异"
+    }
+  }
+}

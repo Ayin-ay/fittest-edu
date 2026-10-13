@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+results/trust_evolution/*.png
+results/trust_evolution/*.json
+# Unified run archive: local data, not for the public repo.
+archive/runs/
+# Legacy archives moved aside during the unification (see archive/legacy/MANIFEST.md).
+# The manifest itself is tracked; the archived files are not.
+archive/legacy/*
+!archive/legacy/MANIFEST.md
+saved_simulations/
+saved_strategies.json
+.streamlit/secrets.toml
+exports/
+
+# 本地私密配置助手：从本机 opencode 配置复制密钥到 gitignored 文件，
+# 密钥不经过命令行、不出现在终端回显。
+.streamlit/setup_secrets.py
+
+# 证据性材料（实跑报告）要进仓库，作为赛事支撑材料；但运行期产物不进。
+saved_simulations/
+saved_strategies.json

@@ -1,0 +1,3317 @@
+{
+  "seeds": 12,
+  "generations": 250,
+  "group_size": 7,
+  "fillers": [
+    "S0",
+    "SM"
+  ],
+  "rules": {
+    "population_capacity": 100,
+    "turns_per_match": 20,
+    "payoffs": {
+      "cooperate_cooperate": [
+        3.0,
+        3.0
+      ],
+      "cooperate_defect": [
+        0.0,
+        5.0
+      ],
+      "defect_cooperate": [
+        5.0,
+        0.0
+      ],
+      "defect_defect": [
+        1.0,
+        1.0
+      ]
+    },
+    "allocation": {
+      "ALPHA_ALLOCATE": 0.4,
+      "note": "下一代规模 = 当代规模 * (ALPHA_ALLOCATE + (1-ALPHA_ALLOCATE) * 适应度/平均适应度)"
+    },
+    "extinction": {
+      "EXTINCTION_SIZE": 3,
+      "EXTINCTION_STREAK": 3,
+      "EXTINCTION_FITNESS_RATIO": 0.5,
+      "note": "物种（亚种除外）规模不大于 EXTINCTION_SIZE 时淘汰；分配后与每代结束时各检查一次；连续 EXTINCTION_STREAK 代混合适应度低于平均值 EXTINCTION_FITNESS_RATIO 倍时淘汰"
+    },
+    "subspecies": {
+      "SUBSPECIES_MIN_SIZE": 10,
+      "SUBSPECIES_MIN_RATIO": 0.35,
+      "SUBSPECIES_EXTINCTION_STREAK": 3,
+      "SUBSPECIES_STALL_GENERATIONS": 10,
+      "ALPHA_INVASION": 0.4,
+      "note": "亚种达到规模或占比阈值之一即独立；连续低适应度达阈值则淘汰并归还规模；规模恒为 1 达 SUBSPECIES_STALL_GENERATIONS 代则淘汰"
+    },
+    "mutation": {
+      "MUTATION_MIN_SIZE": 10,
+      "MAX_MUTATION_ATTEMPTS": 4,
+      "MUTATION_WEIGHTS": {
+        "parameter": 25,
+        "jump": 8,
+        "replace": 15,
+        "add": 10,
+        "delete": 30,
+        "swap": 4,
+        "fresh": 4,
+        "inherit": 4
+      },
+      "probability_by_size": {
+        "<=10": 0.0,
+        "<=20": 0.05,
+        "<=40": 0.1,
+        "<=70": 0.15,
+        ">70": 0.2
+      }
+    },
+    "stagnation": {
+      "STAGNATION_TOLERANCE": 2,
+      "STAGNATION_GENERATIONS": 20,
+      "note": "任一编码的规模变动都不超过 STAGNATION_TOLERANCE 时累计静止计数，达到 STAGNATION_GENERATIONS 则按规模加权强制一次变异"
+    }
+  },
+  "rows": [
+    {
+      "encoding": "D0+R1-1",
+      "mean_share": 0.26394,
+      "final_share": 0.28,
+      "survival": 1.0,
+      "dominance": 1.0,
+      "worst_share": 0.11556,
+      "best_share": 0.54278,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+R1-1+RPT1-M",
+      "mean_share": 0.13509,
+      "final_share": 0.10667,
+      "survival": 1.0,
+      "dominance": 1.0,
+      "worst_share": 0.07,
+      "best_share": 0.30444,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+M2",
+      "mean_share": 0.12607,
+      "final_share": 0.115,
+      "survival": 1.0,
+      "dominance": 0.833,
+      "worst_share": 0.06,
+      "best_share": 0.2046,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+M3",
+      "mean_share": 0.12589,
+      "final_share": 0.11,
+      "survival": 1.0,
+      "dominance": 1.0,
+      "worst_share": 0.07,
+      "best_share": 0.20405,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+M1",
+      "mean_share": 0.12216,
+      "final_share": 0.11167,
+      "survival": 1.0,
+      "dominance": 0.583,
+      "worst_share": 0.07,
+      "best_share": 0.185,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+M1",
+      "mean_share": 0.10248,
+      "final_share": 0.0925,
+      "survival": 1.0,
+      "dominance": 1.0,
+      "worst_share": 0.07,
+      "best_share": 0.18444,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+RPT2-M",
+      "mean_share": 0.10113,
+      "final_share": 0.09583,
+      "survival": 1.0,
+      "dominance": 0.167,
+      "worst_share": 0.07,
+      "best_share": 0.16262,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1",
+      "mean_share": 0.09687,
+      "final_share": 0.10833,
+      "survival": 1.0,
+      "dominance": 0.917,
+      "worst_share": 0.06,
+      "best_share": 0.175,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+RPT1-M",
+      "mean_share": 0.08936,
+      "final_share": 0.08917,
+      "survival": 1.0,
+      "dominance": 0.25,
+      "worst_share": 0.07,
+      "best_share": 0.11071,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+R1-1+RPT1-1",
+      "mean_share": 0.08871,
+      "final_share": 0.08417,
+      "survival": 1.0,
+      "dominance": 0.083,
+      "worst_share": 0.05937,
+      "best_share": 0.13603,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+M2",
+      "mean_share": 0.087,
+      "final_share": 0.0875,
+      "survival": 1.0,
+      "dominance": 1.0,
+      "worst_share": 0.07,
+      "best_share": 0.10341,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3",
+      "mean_share": 0.08634,
+      "final_share": 0.08583,
+      "survival": 1.0,
+      "dominance": 0.917,
+      "worst_share": 0.06,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+RPT1-1",
+      "mean_share": 0.08614,
+      "final_share": 0.08417,
+      "survival": 1.0,
+      "dominance": 0.083,
+      "worst_share": 0.08,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+RPT1-M",
+      "mean_share": 0.08583,
+      "final_share": 0.08583,
+      "survival": 1.0,
+      "dominance": 0.333,
+      "worst_share": 0.06,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+M1",
+      "mean_share": 0.08454,
+      "final_share": 0.0825,
+      "survival": 1.0,
+      "dominance": 0.5,
+      "worst_share": 0.07,
+      "best_share": 0.10444,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+M3",
+      "mean_share": 0.08449,
+      "final_share": 0.08583,
+      "survival": 1.0,
+      "dominance": 0.917,
+      "worst_share": 0.07,
+      "best_share": 0.10794,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1",
+      "mean_share": 0.08436,
+      "final_share": 0.085,
+      "survival": 1.0,
+      "dominance": 0.667,
+      "worst_share": 0.05246,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+C4-C",
+      "mean_share": 0.08378,
+      "final_share": 0.08333,
+      "survival": 1.0,
+      "dominance": 0.333,
+      "worst_share": 0.06056,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+RPT1-1",
+      "mean_share": 0.08361,
+      "final_share": 0.0825,
+      "survival": 1.0,
+      "dominance": 0.083,
+      "worst_share": 0.0781,
+      "best_share": 0.11151,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-M+M2",
+      "mean_share": 0.08011,
+      "final_share": 0.08,
+      "survival": 1.0,
+      "dominance": 0.083,
+      "worst_share": 0.04143,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+RPT2-M",
+      "mean_share": 0.07845,
+      "final_share": 0.07833,
+      "survival": 1.0,
+      "dominance": 0.5,
+      "worst_share": 0.07,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+RPT2-M",
+      "mean_share": 0.07762,
+      "final_share": 0.07667,
+      "survival": 1.0,
+      "dominance": 0.417,
+      "worst_share": 0.04,
+      "best_share": 0.11143,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-M+C2",
+      "mean_share": 0.07251,
+      "final_share": 0.06917,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04119,
+      "best_share": 0.09968,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+RPT1-1",
+      "mean_share": 0.0725,
+      "final_share": 0.0725,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.06,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+RPT2-M",
+      "mean_share": 0.07,
+      "final_share": 0.07,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.05,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+C2",
+      "mean_share": 0.06554,
+      "final_share": 0.06333,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+M3",
+      "mean_share": 0.06364,
+      "final_share": 0.06417,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.06,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+M3",
+      "mean_share": 0.05927,
+      "final_share": 0.05917,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.05119,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+R1-1+M2",
+      "mean_share": 0.05791,
+      "final_share": 0.05583,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04,
+      "best_share": 0.14135,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+R1-1+C2",
+      "mean_share": 0.0512,
+      "final_share": 0.05083,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+RPT1-M",
+      "mean_share": 0.04167,
+      "final_share": 0.04167,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04,
+      "best_share": 0.05,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+M2",
+      "mean_share": 0.04162,
+      "final_share": 0.04167,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04,
+      "best_share": 0.05944,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+M2",
+      "mean_share": 0.04,
+      "final_share": 0.04,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+C4-C",
+      "mean_share": 0.04,
+      "final_share": 0.04,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+C4-C",
+      "mean_share": 0.04,
+      "final_share": 0.04,
+      "survival": 1.0,
+      "dominance": 0.0,
+      "worst_share": 0.04,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+M1",
+      "mean_share": 0.14209,
+      "final_share": 0.12917,
+      "survival": 0.917,
+      "dominance": 1.0,
+      "worst_share": 0.09,
+      "best_share": 0.28405,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+C4-D",
+      "mean_share": 0.07854,
+      "final_share": 0.0775,
+      "survival": 0.917,
+      "dominance": 0.583,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+C4-D",
+      "mean_share": 0.07583,
+      "final_share": 0.07583,
+      "survival": 0.917,
+      "dominance": 0.25,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+M2",
+      "mean_share": 0.07333,
+      "final_share": 0.07333,
+      "survival": 0.917,
+      "dominance": 0.583,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+RPT2-M",
+      "mean_share": 0.07304,
+      "final_share": 0.07083,
+      "survival": 0.917,
+      "dominance": 0.667,
+      "worst_share": 0.01111,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+M1",
+      "mean_share": 0.0725,
+      "final_share": 0.0725,
+      "survival": 0.917,
+      "dominance": 0.25,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+M3",
+      "mean_share": 0.0725,
+      "final_share": 0.0725,
+      "survival": 0.917,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+RPT1-1",
+      "mean_share": 0.0716,
+      "final_share": 0.07083,
+      "survival": 0.917,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M",
+      "mean_share": 0.07,
+      "final_share": 0.07,
+      "survival": 0.917,
+      "dominance": 0.75,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+C4-D",
+      "mean_share": 0.06967,
+      "final_share": 0.0675,
+      "survival": 0.917,
+      "dominance": 0.25,
+      "worst_share": 0.02603,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+RPT1-M",
+      "mean_share": 0.06919,
+      "final_share": 0.06833,
+      "survival": 0.917,
+      "dominance": 0.167,
+      "worst_share": 0.00913,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+C4-C",
+      "mean_share": 0.06667,
+      "final_share": 0.06667,
+      "survival": 0.917,
+      "dominance": 0.333,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+C4-C",
+      "mean_share": 0.05583,
+      "final_share": 0.05583,
+      "survival": 0.917,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+C2",
+      "mean_share": 0.04833,
+      "final_share": 0.04833,
+      "survival": 0.917,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+C2",
+      "mean_share": 0.04417,
+      "final_share": 0.04417,
+      "survival": 0.917,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+C2",
+      "mean_share": 0.08373,
+      "final_share": 0.065,
+      "survival": 0.833,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.18373,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+C2",
+      "mean_share": 0.06836,
+      "final_share": 0.065,
+      "survival": 0.833,
+      "dominance": 0.417,
+      "worst_share": 0.0,
+      "best_share": 0.10048,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+RPT1-1",
+      "mean_share": 0.06631,
+      "final_share": 0.06583,
+      "survival": 0.833,
+      "dominance": 0.333,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+M3",
+      "mean_share": 0.06566,
+      "final_share": 0.065,
+      "survival": 0.833,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+M1",
+      "mean_share": 0.06496,
+      "final_share": 0.0625,
+      "survival": 0.833,
+      "dominance": 0.333,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+C4-D",
+      "mean_share": 0.06478,
+      "final_share": 0.0575,
+      "survival": 0.833,
+      "dominance": 1.0,
+      "worst_share": 0.00246,
+      "best_share": 0.10968,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+P1-1+M2",
+      "mean_share": 0.05788,
+      "final_share": 0.05583,
+      "survival": 0.833,
+      "dominance": 0.0,
+      "worst_share": 0.01206,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+P1-1+RPT1-M",
+      "mean_share": 0.05356,
+      "final_share": 0.05167,
+      "survival": 0.833,
+      "dominance": 0.0,
+      "worst_share": 0.01111,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+P1-1+RPT1-1",
+      "mean_share": 0.05117,
+      "final_share": 0.04917,
+      "survival": 0.833,
+      "dominance": 0.0,
+      "worst_share": 0.01143,
+      "best_share": 0.07016,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+C4-C",
+      "mean_share": 0.04972,
+      "final_share": 0.04917,
+      "survival": 0.833,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+P1-1",
+      "mean_share": 0.03574,
+      "final_share": 0.03333,
+      "survival": 0.833,
+      "dominance": 0.0,
+      "worst_share": 0.00667,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+RPT1-M",
+      "mean_share": 0.03417,
+      "final_share": 0.03417,
+      "survival": 0.833,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.05,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+C4-D",
+      "mean_share": 0.1848,
+      "final_share": 0.06083,
+      "survival": 0.75,
+      "dominance": 1.0,
+      "worst_share": 0.00722,
+      "best_share": 0.63135,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+C4-D",
+      "mean_share": 0.14972,
+      "final_share": 0.1175,
+      "survival": 0.75,
+      "dominance": 0.917,
+      "worst_share": 0.0,
+      "best_share": 0.82,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+C2",
+      "mean_share": 0.12747,
+      "final_share": 0.07417,
+      "survival": 0.75,
+      "dominance": 0.917,
+      "worst_share": 0.0,
+      "best_share": 0.73548,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+RPT2-M",
+      "mean_share": 0.04501,
+      "final_share": 0.03833,
+      "survival": 0.75,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "P1-1",
+      "mean_share": 0.03656,
+      "final_share": 0.0325,
+      "survival": 0.75,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.05484,
+      "runs": 12
+    },
+    {
+      "encoding": "P1-1+M2",
+      "mean_share": 0.03506,
+      "final_share": 0.0325,
+      "survival": 0.75,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.05,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+C4-D",
+      "mean_share": 0.03417,
+      "final_share": 0.03417,
+      "survival": 0.75,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+C4-D",
+      "mean_share": 0.13596,
+      "final_share": 0.0725,
+      "survival": 0.667,
+      "dominance": 1.0,
+      "worst_share": 0.04968,
+      "best_share": 0.28881,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+K1-2+C2",
+      "mean_share": 0.07587,
+      "final_share": 0.05,
+      "survival": 0.667,
+      "dominance": 0.667,
+      "worst_share": 0.0,
+      "best_share": 0.17071,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+RPT2-M",
+      "mean_share": 0.05735,
+      "final_share": 0.05167,
+      "survival": 0.667,
+      "dominance": 0.417,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1",
+      "mean_share": 0.052,
+      "final_share": 0.04833,
+      "survival": 0.667,
+      "dominance": 0.25,
+      "worst_share": 0.0,
+      "best_share": 0.0831,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+M3",
+      "mean_share": 0.05084,
+      "final_share": 0.04833,
+      "survival": 0.667,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.09556,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+M2",
+      "mean_share": 0.04798,
+      "final_share": 0.0475,
+      "survival": 0.667,
+      "dominance": 0.25,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+M1",
+      "mean_share": 0.04796,
+      "final_share": 0.0475,
+      "survival": 0.667,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.08548,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+RPT1-M",
+      "mean_share": 0.04699,
+      "final_share": 0.04333,
+      "survival": 0.667,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+C2",
+      "mean_share": 0.03767,
+      "final_share": 0.03167,
+      "survival": 0.667,
+      "dominance": 0.417,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "P1-1+RPT1-1",
+      "mean_share": 0.03333,
+      "final_share": 0.02917,
+      "survival": 0.667,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.05968,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+C2",
+      "mean_share": 0.03296,
+      "final_share": 0.03167,
+      "survival": 0.667,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.05,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-M+RPT1-1",
+      "mean_share": 0.02913,
+      "final_share": 0.02667,
+      "survival": 0.667,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+C4-D",
+      "mean_share": 0.06035,
+      "final_share": 0.04167,
+      "survival": 0.583,
+      "dominance": 0.583,
+      "worst_share": 0.0,
+      "best_share": 0.25468,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+C4-C",
+      "mean_share": 0.03667,
+      "final_share": 0.03667,
+      "survival": 0.583,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+M3",
+      "mean_share": 0.03606,
+      "final_share": 0.035,
+      "survival": 0.583,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+M3",
+      "mean_share": 0.03534,
+      "final_share": 0.03417,
+      "survival": 0.583,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+RC1-1+RPT1-1",
+      "mean_share": 0.0275,
+      "final_share": 0.0275,
+      "survival": 0.583,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+C4-D",
+      "mean_share": 0.02667,
+      "final_share": 0.02667,
+      "survival": 0.583,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.05,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-1+RC1-1+RPT1-1",
+      "mean_share": 0.02583,
+      "final_share": 0.02583,
+      "survival": 0.583,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+C4-D",
+      "mean_share": 0.09093,
+      "final_share": 0.0475,
+      "survival": 0.5,
+      "dominance": 1.0,
+      "worst_share": 0.01556,
+      "best_share": 0.21484,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+RPT1-M",
+      "mean_share": 0.0394,
+      "final_share": 0.0325,
+      "survival": 0.5,
+      "dominance": 0.333,
+      "worst_share": 0.0,
+      "best_share": 0.17063,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+K1-2+M2",
+      "mean_share": 0.03919,
+      "final_share": 0.0375,
+      "survival": 0.5,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+M2",
+      "mean_share": 0.02987,
+      "final_share": 0.0275,
+      "survival": 0.5,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+RPT2-M",
+      "mean_share": 0.02975,
+      "final_share": 0.0275,
+      "survival": 0.5,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+RPT1-M",
+      "mean_share": 0.02927,
+      "final_share": 0.02917,
+      "survival": 0.5,
+      "dominance": 0.083,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2+RC1-1+RPT1-1",
+      "mean_share": 0.0286,
+      "final_share": 0.02917,
+      "survival": 0.5,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+K1-2+RPT1-M",
+      "mean_share": 0.02821,
+      "final_share": 0.0275,
+      "survival": 0.5,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+M2",
+      "mean_share": 0.02584,
+      "final_share": 0.02583,
+      "survival": 0.5,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+K1-2+RPT1-1",
+      "mean_share": 0.02222,
+      "final_share": 0.02,
+      "survival": 0.5,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-3+C4-D",
+      "mean_share": 0.02083,
+      "final_share": 0.02083,
+      "survival": 0.5,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.05,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+RC1-1+RPT1-1",
+      "mean_share": 0.02,
+      "final_share": 0.02,
+      "survival": 0.5,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-2",
+      "mean_share": 0.10851,
+      "final_share": 0.0975,
+      "survival": 0.417,
+      "dominance": 0.583,
+      "worst_share": 0.07,
+      "best_share": 0.16397,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M",
+      "mean_share": 0.10219,
+      "final_share": 0.09833,
+      "survival": 0.417,
+      "dominance": 0.583,
+      "worst_share": 0.07,
+      "best_share": 0.16667,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+C2",
+      "mean_share": 0.03839,
+      "final_share": 0.03083,
+      "survival": 0.417,
+      "dominance": 0.167,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3",
+      "mean_share": 0.03453,
+      "final_share": 0.03083,
+      "survival": 0.417,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+C2",
+      "mean_share": 0.03384,
+      "final_share": 0.03083,
+      "survival": 0.417,
+      "dominance": 0.25,
+      "worst_share": 0.0,
+      "best_share": 0.08357,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+RPT2-M",
+      "mean_share": 0.03103,
+      "final_share": 0.03,
+      "survival": 0.417,
+      "dominance": 0.25,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1+K1-2+RPT1-1",
+      "mean_share": 0.02917,
+      "final_share": 0.02917,
+      "survival": 0.417,
+      "dominance": 0.083,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1+K1-2",
+      "mean_share": 0.02905,
+      "final_share": 0.02833,
+      "survival": 0.417,
+      "dominance": 0.167,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "P1-1+C2",
+      "mean_share": 0.02597,
+      "final_share": 0.02083,
+      "survival": 0.417,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06778,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+C2",
+      "mean_share": 0.0251,
+      "final_share": 0.02,
+      "survival": 0.417,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+M1",
+      "mean_share": 0.02167,
+      "final_share": 0.02167,
+      "survival": 0.417,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+M1",
+      "mean_share": 0.01667,
+      "final_share": 0.01667,
+      "survival": 0.417,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "SM",
+      "mean_share": 0.13867,
+      "final_share": 0.09409,
+      "survival": 0.337,
+      "dominance": 0.641,
+      "worst_share": 0.0,
+      "best_share": 0.95095,
+      "runs": 552
+    },
+    {
+      "encoding": "D0+K1-2",
+      "mean_share": 0.03709,
+      "final_share": 0.03667,
+      "survival": 0.333,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+RPT2-M",
+      "mean_share": 0.02697,
+      "final_share": 0.02583,
+      "survival": 0.333,
+      "dominance": 0.417,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+RPT1-M",
+      "mean_share": 0.02542,
+      "final_share": 0.02417,
+      "survival": 0.333,
+      "dominance": 0.25,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+M2",
+      "mean_share": 0.0249,
+      "final_share": 0.02083,
+      "survival": 0.333,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2+RPT1-1",
+      "mean_share": 0.02419,
+      "final_share": 0.02417,
+      "survival": 0.333,
+      "dominance": 0.083,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+C4-C",
+      "mean_share": 0.02282,
+      "final_share": 0.0225,
+      "survival": 0.333,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.1,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+M2",
+      "mean_share": 0.02015,
+      "final_share": 0.02,
+      "survival": 0.333,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+M3",
+      "mean_share": 0.01365,
+      "final_share": 0.01333,
+      "survival": 0.333,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-3+M1",
+      "mean_share": 0.01333,
+      "final_share": 0.01333,
+      "survival": 0.333,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-2",
+      "mean_share": 0.03535,
+      "final_share": 0.035,
+      "survival": 0.25,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+C2",
+      "mean_share": 0.01938,
+      "final_share": 0.01083,
+      "survival": 0.25,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06167,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+RPT1-1",
+      "mean_share": 0.01844,
+      "final_share": 0.01667,
+      "survival": 0.25,
+      "dominance": 0.083,
+      "worst_share": 0.0,
+      "best_share": 0.07,
+      "runs": 12
+    },
+    {
+      "encoding": "D0+RPT1-1",
+      "mean_share": 0.01836,
+      "final_share": 0.01833,
+      "survival": 0.25,
+      "dominance": 0.167,
+      "worst_share": 0.0,
+      "best_share": 0.08,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+M2",
+      "mean_share": 0.01667,
+      "final_share": 0.01667,
+      "survival": 0.25,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.09,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+P1-1+RPT1-M",
+      "mean_share": 0.0146,
+      "final_share": 0.01167,
+      "survival": 0.25,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+RPT2-M",
+      "mean_share": 0.01431,
+      "final_share": 0.01,
+      "survival": 0.25,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "S0",
+      "mean_share": 0.01987,
+      "final_share": 0.01933,
+      "survival": 0.239,
+      "dominance": 0.096,
+      "worst_share": 0.0,
+      "best_share": 0.19984,
+      "runs": 552
+    },
+    {
+      "encoding": "R3-3",
+      "mean_share": 0.02783,
+      "final_share": 0.02333,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04016,
+      "runs": 12
+    },
+    {
+      "encoding": "P2-1",
+      "mean_share": 0.0123,
+      "final_share": 0.01,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+RPT1-M",
+      "mean_share": 0.0096,
+      "final_share": 0.00667,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M",
+      "mean_share": 0.00944,
+      "final_share": 0.00667,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "P2-1+RPT1-1",
+      "mean_share": 0.00886,
+      "final_share": 0.00667,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+C4-C",
+      "mean_share": 0.00833,
+      "final_share": 0.00833,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "P2-2",
+      "mean_share": 0.00833,
+      "final_share": 0.00833,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+M3",
+      "mean_share": 0.0075,
+      "final_share": 0.0075,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.05,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+M3",
+      "mean_share": 0.00667,
+      "final_share": 0.00667,
+      "survival": 0.167,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "D0",
+      "mean_share": 0.01808,
+      "final_share": 0.0175,
+      "survival": 0.083,
+      "dominance": 0.75,
+      "worst_share": 0.0,
+      "best_share": 0.07619,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+RPT1-M",
+      "mean_share": 0.00704,
+      "final_share": 0.00333,
+      "survival": 0.083,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+RPT1-1",
+      "mean_share": 0.00669,
+      "final_share": 0.00333,
+      "survival": 0.083,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-3+C4-C",
+      "mean_share": 0.00608,
+      "final_share": 0.00333,
+      "survival": 0.083,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+RPT1-1",
+      "mean_share": 0.00556,
+      "final_share": 0.005,
+      "survival": 0.083,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.06,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+K1-2+M2",
+      "mean_share": 0.00466,
+      "final_share": 0.00333,
+      "survival": 0.083,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+K1-2+RPT1-M",
+      "mean_share": 0.00426,
+      "final_share": 0.00333,
+      "survival": 0.083,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "R2-1+M2",
+      "mean_share": 0.00417,
+      "final_share": 0.00417,
+      "survival": 0.083,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.05,
+      "runs": 12
+    },
+    {
+      "encoding": "D1+M2",
+      "mean_share": 0.00333,
+      "final_share": 0.00333,
+      "survival": 0.083,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3+RC1-1+RPT1-M",
+      "mean_share": 0.00333,
+      "final_share": 0.00333,
+      "survival": 0.083,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.04,
+      "runs": 12
+    },
+    {
+      "encoding": "W",
+      "mean_share": 0.00265,
+      "final_share": 0.00417,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.03175,
+      "runs": 12
+    },
+    {
+      "encoding": "W+C2",
+      "mean_share": 0.00166,
+      "final_share": 0.00583,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.01992,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+K1-2+C2",
+      "mean_share": 0.00077,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.00929,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2",
+      "mean_share": 0.00048,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.00571,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1+RPT1-1",
+      "mean_share": 0.0002,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.00238,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-M",
+      "mean_share": 0.00011,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.00127,
+      "runs": 12
+    },
+    {
+      "encoding": "R1-M+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+C4-C",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+RPT1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-1+RPT2-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+M1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+C4-C",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "R3-M+M1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P2-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P2-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P2-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P2-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P2-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P3-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P3-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P3-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "P3-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H2-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H2-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H2-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H2-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H3-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H3-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H3-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H3-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H2-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H2-M+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H2-M+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "H2-M+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-3",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-3+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-3+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-3+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-M+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-M+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "B1-M+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-3",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-3+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-3+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-3+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K2-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K2-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K2-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K2-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-M+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-M+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "K1-M+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-M+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-M+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "RC1-M+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S0+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S0+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S0+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S3",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S3+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S3+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S3+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F3-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F3-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F3-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F3-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T1-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T1-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T1-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T1-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T1-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T1-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T1-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T2-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T2-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T2-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "T2-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "D1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "D1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "D1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD0",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD0+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD0+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD0+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "W+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "W+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS3",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS3+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS3+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "BS3+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-1+RPT1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+P1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+P1-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+P1-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+P1-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3+RC1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3+RC1-1+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3+RC1-1+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F2-3+RC1-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+K1-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+K1-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+P1-1+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+K1-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+K1-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+K1-2+RPT1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+K1-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+K1-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+B1-2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+B1-2+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+B1-2+RPT1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 1.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+B1-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "S1+B1-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-M+RPT1-1",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "F1-1+RC1-M+RPT1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1+K1-2+RPT1-M",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1+K1-2+M2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    },
+    {
+      "encoding": "AD1+K1-2+C2",
+      "mean_share": 0.0,
+      "final_share": 0.0,
+      "survival": 0.0,
+      "dominance": 0.0,
+      "worst_share": 0.0,
+      "best_share": 0.0,
+      "runs": 12
+    }
+  ]
+}
