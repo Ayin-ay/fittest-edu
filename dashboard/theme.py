@@ -18,6 +18,8 @@ reader who cannot rely on hue.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 # Warm paper ground, not the default cool white.
 GROUND = "#FBF7F0"
 SURFACE = "#FFFFFF"
@@ -63,9 +65,12 @@ H4_SIZE = "1.02rem"
 CONTENT_WIDTH = "1280px"
 
 
-# The landing illustration. Served through Streamlit's static directory, so it
-# stays on the app's own origin and loads offline once the page is open.
-HERO_SVG = "app/static/hero.svg"
+# The landing illustration, read off disk and inlined. An ``<img>`` pointed at
+# ``app/static/hero.svg`` only resolves under local ``streamlit run``: on Streamlit
+# Cloud that path hits the edge node's generic shell instead of the file (see
+# docs/deployment.md 4.4), so the first screen would ship a broken image. The SVG
+# travels inside the repository, so a server-side read needs no static serving.
+HERO_PATH = Path(__file__).parent / "static" / "hero.svg"
 
 # Page ground: warm paper with two faint washes of the brand colours, one at the
 # top-right and one at the bottom-left. The tiled payoff-matrix motif that used
@@ -1137,15 +1142,18 @@ MODE_ICONS = {
     ),
 }
 
-HERO_ALT = "左侧为支付热力网格，右侧为策略谱系分叉图"
-
-
 #: The arrow inside the "explain this to me" pill. An inline link there is read
 #: as part of the sentence; the arrow is what turns it into an affordance.
 JUMP_ARROW = (
     '<svg viewBox="0 0 24 24" aria-hidden="true">'
     '<path d="M12 4.5v13"/><path d="M6.5 12l5.5 5.5L17.5 12"/></svg>'
 )
+
+
+def hero_art() -> str:
+    """The illustration markup, with ``.tf-art`` grafted onto the root node."""
+    return HERO_PATH.read_text(encoding="utf-8").replace(
+        "<svg ", '<svg class="tf-art" ', 1)
 
 
 def landing_hero(
@@ -1156,8 +1164,13 @@ def landing_hero(
     jump_label: str,
     jump_anchor: str,
 ) -> str:
-    """The masthead: the pitch on the left, the subject matter on the right."""
-    return (
+    """The masthead: the pitch on the left, the subject matter on the right.
+
+    The illustration is concatenated rather than passed through ``format``: SVG
+    is full of braces and quotes, and a placeholder here would break on the next
+    edit to the drawing.
+    """
+    words = (
         '<div class="tf-hero">'
         "<div>"
         '<p class="tf-eyebrow">{}</p>'
@@ -1165,12 +1178,10 @@ def landing_hero(
         '<p class="tf-lede">{}</p>'
         '<a class="tf-jump" href="#{}">{}{}</a>'
         "</div>"
-        '<img class="tf-art" src="{}" alt="{}" />'
-        "</div>"
     ).format(
         eyebrow, title, title_sub, lede, jump_anchor, jump_label, JUMP_ARROW,
-        HERO_SVG, HERO_ALT,
     )
+    return words + hero_art() + "</div>"
 
 
 def payoff_chips() -> str:

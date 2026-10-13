@@ -97,37 +97,55 @@ git push -u origin main
    > 也不会下发到浏览器。
 
 6. Deploy，等待构建完成，得到形如 `https://<app>.streamlit.app` 的网址。
-   本应用当前地址为 **<https://the-fittest.streamlit.app>**。
+   本应用当前地址为 **<https://fittest-edu.streamlit.app>**。
 
    > 子域名在 Cloud 后台应用 Settings 里单独修改，**与 GitHub 仓库名无关**；
    > 改子域名会让旧网址失效，请尽早确定并只对外发布最终地址。
+   >
+   > 另一个地址 `the-fittest.streamlit.app` 属于**另一个项目**，与本仓库无关，
+   > 不要写进任何对外材料。
 
 ### 4.3 分享文案模板
 
 ```
 The Fittest 策略进化模拟
-网址：https://the-fittest.streamlit.app
+网址：https://fittest-edu.streamlit.app
 密码：<你的访问密码>
 首次打开约需 30 秒唤醒，之后流畅使用。
 ```
 
 ### 4.4 应用图标
 
-图标托管在**独立的公开仓库** `Ayin-ay/the-fittest-assets`，只公开图标，主仓库仍保持私有：
+图标另托管在公开仓库 `Ayin-ay/the-fittest-assets`：
 
 ```
 https://raw.githubusercontent.com/Ayin-ay/the-fittest-assets/main/icon.png
 ```
 
-为什么不用主仓库的图片链接：
+为什么另起一个仓库：主仓库目前是**公开**的，直链可用；但把品牌资产单独放一个
+仓库，主仓库将来转私有也不会让图标链接忽然失效。仍需注意：
 
-- 主仓库是**私有**的，`raw.githubusercontent.com` 与 `jsDelivr` 对私有仓库一律返回 404；
-- GitHub 的 `.../blob/...` 链接返回的是**网页**（`text/html`），不是图片；
+- GitHub 的 `.../blob/...` 链接返回的是**网页**（`text/html`），不是图片，
+  要直链必须用 `raw.githubusercontent.com`；
 - Streamlit Cloud **实测不提供**文档所写的静态文件服务——`app/static/*` 会命中
   边缘节点的通用外壳（`text/html`）。同一路径在本地 `streamlit run` 下正常
   （见 `dashboard/static/` 与 `config.toml` 的 `enableStaticServing`），但线上不可依赖。
+  首页插画因此在 `theme.hero_art()` 里读文件内联，而不是 `<img src="app/static/…">`。
 
 因此任何需要「图标 URL」的第三方表单，都填上面那个公开仓库的直链。
+
+### 4.5 谁能打开这个网址
+
+匿名访问 `https://fittest-edu.streamlit.app/` 会得到 303，跳转到
+`https://share.streamlit.io/-/auth/app?redirect_uri=…`，即 Cloud 的登录门；
+带浏览器 User-Agent 结果一致，所以这不是爬虫过滤。两种放行方式：
+
+- **加成员**：Cloud 后台 → 工作区 → Settings → Members → 邀请对方的 GitHub 账号。
+  网址保持仅成员可见。注意同一个工作区里的应用会一起可见。
+- **改公开**：该应用 → Settings → Who can access this app → Public。任何拿到
+  网址的人都可直接进入，无需登录。
+
+无论走哪条，若线上 Secrets 设了 `APP_PASSWORD`，进去之后仍要再输一次访问密码。
 
 ## 5. 常见问题
 
