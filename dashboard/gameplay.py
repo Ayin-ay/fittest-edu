@@ -147,13 +147,108 @@ RELATIONSHIPS = {
 
 
 def _relationship(my_action: str, their_action: str) -> str:
-    """Label one round by the pair of actions, with the running score beneath."""
+    """Label one round by the pair of actions."""
     label, colour = RELATIONSHIPS[(my_action, their_action)]
-    gap = ""
+    return "<div style='font-weight:700;color:%s'>%s</div>" % (colour, label)
+
+
+def branch_strip(action: str, live_branch: str | None = None) -> str:
+    """What one choice is worth, split by what the opponent does.
+
+    Without this the player has to hold the payoff matrix in mind while picking,
+    and the whole point of the game is that the choice is a bet on the other
+    side's behaviour rather than a fixed value. ``live_branch`` ("C" or "D", what
+    the opponent just played) tints the branch the player is actually living
+    with, so the risk is not stated as an abstraction.
+    """
+    cells = []
+    for their_action, label in (("C", "若对手合作"), ("D", "若对手背叛")):
+        points = PAYOFFS[(action, their_action)][0]
+        cells.append(
+            "<div class='tf-branch%s'>"
+            "<span class='tf-branch__them'>%s</span>"
+            "<span class='tf-branch__mine'>+%s</span>"
+            "</div>"
+            % (
+                " tf-branch--best" if live_branch == their_action else "",
+                label, _whole(points),
+            )
+        )
+    return "<div class='tf-branches'>%s</div>" % "".join(cells)
+
+
+def action_cue(their_action: str) -> str:
+    """One line about what the opponent just did, coloured by that action.
+
+    This used to be an ``st.info`` box. Once the branch strip under each button
+    tints the branch this move corresponds to, the box restates it and takes a
+    block of height on the screen a player stares at ten times per match.
+    """
+    defect = their_action == "D"
+    text = (
+        "对手上一轮背叛了 —— 下方高亮的就是它刚选的那条分支。" if defect
+        else "对手上一轮合作了。"
+    )
+    return "<div class='tf-cue%s'><i></i>%s</div>" % (
+        " tf-cue--defect" if defect else "", text)
+
+
+def stage_strip(
+    match_count: int,
+    outcomes: list[tuple[float, float]],
+    turn: int,
+    turns: int,
+    total_score: float,
+) -> str:
+    """Where the player is: which matches are done, which turn is live.
+
+    ``outcomes`` is the finished matches as (your score, their score) pairs, so
+    the pips can tell a won match from a lost one -- a progress bar could only
+    count them.
+    """
+    pips = []
+    for index in range(match_count):
+        if index < len(outcomes):
+            you, them = outcomes[index]
+            state = "win" if you > them else ("loss" if you < them else "draw")
+        elif index == len(outcomes):
+            state = "here"
+        else:
+            state = "todo"
+        pips.append(
+            "<i class='tf-pip%s'></i>"
+            % (" tf-pip--" + state if state != "todo" else "")
+        )
+
+    done_turns = min(max(turn - 1, 0), turns)
+    share = done_turns / max(turns, 1) * 100
+    # ``turn`` comes from the runner and keeps counting past the last round, so
+    # on the settlement screen it would read 第 11 / 10 轮.
+    turn_label = (
+        "本局结束" if turn > turns else "本轮第 %d / %d 轮" % (turn, turns))
+    # Once the match is over the reveal is on the same screen, so promising
+    # secrecy would contradict what the player is looking at.
+    secret = (
+        "对手身份已在下方揭晓。" if turn > turns
+        else "先看它做了什么，再决定你怎么应对。")
     return (
-        "<div style='font-weight:700;color:%s'>%s</div>"
-        "<div style='font-size:12px;color:%s'>%s</div>"
-        % (colour, label, "#6B6156", gap)
+        "<div class='tf-stage'>"
+        "<div class='tf-stage__top'>"
+        "<span class='tf-stage__kicker'>对局</span>"
+        "<span class='tf-stage__count'>第 %d<em> / %d 局</em></span>"
+        "<span class='tf-stage__total'>跨局总得分<b>%s</b></span>"
+        "</div>"
+        "<div class='tf-pips'>%s</div>"
+        "<div class='tf-track'><div class='tf-track__fill' style='width:%.1f%%'></div></div>"
+        "<div class='tf-stage__sub'>"
+        "<span class='tf-stage__turn'>%s</span>"
+        "<span class='tf-stage__secret'>%s</span>"
+        "</div>"
+        "</div>"
+        % (
+            len(outcomes) + 1, match_count, _whole(total_score),
+            "".join(pips), share, turn_label, secret,
+        )
     )
 
 
@@ -200,6 +295,11 @@ def history_table(
         row_style = ("background:%s;" % theme.RAISED) if highlight == turn else ""
         my_cell = action_badge(my_action, "你") if my_action else "—"
         their_cell = action_badge(their_action, "对手") if their_action else "—"
+        if my_action and their_action:
+            running = "<b style='color:%s'>%s</b> <span style='color:%s'>/ %s</span>" % (
+                theme.INK, _whole(my_running), theme.MUTED, _whole(their_running))
+        else:
+            running = "<span style='color:%s'>—</span>" % theme.MUTED
         body.append(
             "<tr style='{row}'>"
             "<td style='text-align:center;color:{muted}'>{turn}</td>"
@@ -207,9 +307,11 @@ def history_table(
             "<td style='text-align:center'>{theirs}</td>"
             "<td style='text-align:center'>{points}</td>"
             "<td style='text-align:center'>{outcome}</td>"
+            "<td style='text-align:center'>{running}</td>"
             "</tr>".format(
                 row=row_style, turn=turn + 1, mine=my_cell,
                 theirs=their_cell, points=points, outcome=outcome,
+                running=running,
                 muted=theme.MUTED,
             )
         )
@@ -226,18 +328,26 @@ def history_table(
         + head_cell("你的选择")
         + head_cell("对手选择")
         + head_cell("本轮得分<br>你/对手")
-        + head_cell("累计")
+        + head_cell("本轮结果")
+        + head_cell("本局累计<br>你/对手")
     )
+    # The margin rather than a repeat of the totals: the last row of the 本局累计
+    # column already gives both numbers, so a 合计 line underneath only doubled it.
+    margin = my_running - their_running
+    if margin:
+        word = "你领先 %s 分" if margin > 0 else "你落后 %s 分"
+        colour = theme.MUTUAL if margin > 0 else theme.DEFECT
+        summary = word % _whole(abs(margin))
+    else:
+        colour, summary = theme.MUTED, "双方持平"
     return (
         "<div style='overflow-x:auto;margin:0.4rem 0 0.8rem'>"
-        "<table style='border-collapse:collapse;width:100%;max-width:640px;"
+        "<table style='border-collapse:collapse;width:100%;max-width:760px;"
         "font-size:15px'>"
         "<thead><tr>" + headers + "</tr></thead>"
         "<tbody>" + "".join(body) + "</tbody></table>"
-        "<div style='color:" + theme.MUTED + ";font-size:14px;margin-top:4px'>"
-        "合计　你 <b style='font-size:16px'>" + str(_whole(my_running)) + "</b> 分　"
-        "对手 <b style='font-size:16px'>" + str(_whole(their_running)) + "</b> 分"
-        "</div></div>"
+        "<div style='color:" + colour + ";font-size:14px;font-weight:600;"
+        "margin-top:4px'>" + summary + "</div></div>"
     )
 
 

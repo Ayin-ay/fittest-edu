@@ -16,6 +16,12 @@ baseRadius = "medium"
 font = "sans-serif"
 showWidgetBorder = true
 showSidebarBorder = true
+# Every rem on the page resolves against this. The layout was designed at 16px,
+# which reads small on the 1920px+ screens the app is opened on; raising it
+# scales headings, body text, spacing and widget metrics together, so the
+# proportions stay as laid out. A stylesheet cannot do this: st.markdown's
+# <style> lands in a subtree that cannot reach <html>.
+baseFontSize = 17
 
 [theme.sidebar]
 backgroundColor = "#F5EFE4"

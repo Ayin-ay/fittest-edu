@@ -37,7 +37,14 @@ from trust_evolution_simulation import (  # noqa: E402
     TrustEvolution,
     parse_strategy,
 )
-from dashboard.content import INTRO_MARKDOWN, STRATEGY_MARKDOWN  # noqa: E402
+from dashboard.content import (  # noqa: E402
+    INTRO_MARKDOWN,
+    LANDING_ARCH,
+    LANDING_GLOSS,
+    LANDING_STEPS,
+    LANDING_WHY,
+    STRATEGY_MARKDOWN,
+)
 try:
     from dashboard.responsive import (  # noqa: E402
         MODE_AUTO,
@@ -104,10 +111,13 @@ from dashboard import evolution_analysis  # noqa: E402
 from dashboard import theme  # noqa: E402
 from dashboard.gameplay import (  # noqa: E402
     PlayerMatchRunner,
+    action_cue,
+    branch_strip,
     build_results,
     build_results_figure,
     draw_opponents,
     history_table,
+    stage_strip,
     strategy_tournament,
 )
 from dashboard.profiling import build_profile  # noqa: E402
@@ -1265,63 +1275,133 @@ def render_main() -> None:
 MODE_CREATION = "creation"
 MODE_GAME = "game"
 
-MODE_CARDS = [
-    (
-        MODE_CREATION,
-        "🎛 创造模式",
-        "演化模拟工作台",
-        "配置初始种群、逐轮推进演化、观察种群与适应度变化、"
-        "做策略热力图与谱系分析，并把整次运行保存成 AI 可直接读取的统一存档。",
-    ),
-    (
-        MODE_GAME,
-        "🎮 游戏模式",
-        "与策略对局，然后看懂自己的选择",
-        "先用一段五轮模拟对局把规则学会（合作各得 3 分、被背叛得 0 分、"
-        "回击至少拿回 1 分）；随后与 10 个行为各异的随机策略各战 10 轮，"
-        "每一步自己决定合作或背叛。结束后得到一张 11×11 的得分热力图、"
-        "九项维度得分，以及一份逐步引用你每一步选择的解读报告。",
-    ),
+# Order is the argument: a first-time visitor should take the game mode, so it
+# leads the row and is the only one whose button is filled.
+LANDING_MODES = [
+    {
+        "mode": MODE_GAME,
+        "slot": "tf_mode_play",
+        "icon": "play",
+        "title": "游戏模式",
+        "subtitle": "与策略对局，然后看懂自己的选择",
+        "bullets": [
+            "五轮教学对局先把规则走一遍，随时可跳过",
+            "与 10 个行为各异的随机策略各战 10 轮，每步自己决定合作或背叛",
+            "结束后拿到 11×11 得分热力图、九项维度得分与逐步解读报告",
+        ],
+        "tags": ["约 8 分钟", "无需配置", "含解读报告"],
+        "badge": "推荐先玩",
+        "cta": "进入游戏模式",
+    },
+    {
+        "mode": MODE_CREATION,
+        "slot": "tf_mode_lab",
+        "icon": "lab",
+        "title": "创造模式",
+        "subtitle": "演化模拟工作台",
+        "bullets": [
+            "配置初始种群与策略组合，逐轮推进演化",
+            "观察种群数量与适应度变化、策略热力图与谱系分析",
+            "整次运行保存为 AI 可直接读取的统一存档",
+        ],
+        "tags": ["沙盒", "谱系分析", "统一存档 v{}".format(RUN_SCHEMA_VERSION)],
+        "badge": "",
+        "cta": "进入创造模式",
+    },
 ]
 
 
+def _enter_mode(mode: str) -> None:
+    st.session_state["app_mode"] = mode
+    st.rerun()
+
+
 def render_mode_select() -> None:
-    """Entry screen: pick a mode before anything else renders."""
+    """Entry screen: what this site is, then which way in."""
     st.markdown(SPLASH_CSS, unsafe_allow_html=True)
-    st.markdown(theme.hero(
-        "适者生存 · 策略演化模拟",
-        "The Fittest",
-        "每个策略都是一个物种，在重复囚徒困境中与另外十个物种竞争席位。"
-        "谁能在背叛与合作之间活下来，谁就是适者。",
-        [
-            ("双方合作", "各得 3 分", "coop"),
-            ("一方背叛", "5 分 与 0 分", "defect"),
-            ("双方背叛", "各得 1 分", "mutual"),
-        ],
-    ), unsafe_allow_html=True)
-    st.markdown("### 选择模式")
-    columns = st.columns(2)
-    for column, (key, title, subtitle, body) in zip(columns, MODE_CARDS):
-        with column:
-            with st.container(border=True):
-                st.markdown("### {}".format(title))
-                st.caption(subtitle)
-                st.markdown(body)
-                st.markdown("")
-                if st.button(
-                    "进入" + title.split(" ", 1)[-1],
-                    key="enter_{}".format(key),
-                    width="stretch",
-                    type="primary" if key == MODE_CREATION else "secondary",
-                ):
-                    st.session_state["app_mode"] = key
-                    st.rerun()
+    st.markdown(
+        theme.landing_hero(
+            "Iterated Prisoner&rsquo;s Dilemma · 演化模拟",
+            "The Fittest",
+            "十个策略，一个席位池：谁能在背叛与合作之间活下来",
+            "每个策略都是一个物种，在重复囚徒困境中与另外十个物种竞争席位。"
+            "<b>适者不是最狠的那个，而是活得最久的那个。</b>",
+            "第一次来？30 秒看懂这个网站在做什么",
+            "tf_about",
+        ),
+        unsafe_allow_html=True,
+    )
+
+    # A button cannot be nested inside the hero markup, so this row copies the
+    # hero's own column split and lands the two CTAs under the lede.
+    lead, _art = st.columns([1.05, 0.95], gap="large")
+    with lead:
+        play_cta, lab_cta = st.columns(2, gap="small")
+        # Each button sits in its own keyed container: the entry styling in
+        # theme.py is scoped to those keys so it cannot leak onto every other
+        # button in the app.
+        with play_cta, play_cta.container(key="tf_cta_play"):
+            if st.button(
+                "→ 开始一局（约 8 分钟）", key="landing_play", type="primary", width="content"
+            ):
+                _enter_mode(MODE_GAME)
+        with lab_cta, lab_cta.container(key="tf_cta_lab"):
+            if st.button("打开演化工作台", key="landing_lab", width="content"):
+                _enter_mode(MODE_CREATION)
+
+    st.markdown(theme.payoff_chips(), unsafe_allow_html=True)
+
+    st.markdown('<div id="tf_about"></div>', unsafe_allow_html=True)
+    st.markdown(
+        theme.section("这个网站在做什么", "一句话：一个能让你亲手验证「合作划不划算」的模拟器"),
+        unsafe_allow_html=True,
+    )
+    st.markdown(theme.prose_card(LANDING_WHY), unsafe_allow_html=True)
+    st.markdown(theme.architecture(LANDING_ARCH), unsafe_allow_html=True)
+
+    st.markdown(
+        theme.section("怎么玩", "第一次建议从游戏模式开始，全程约 8 分钟"),
+        unsafe_allow_html=True,
+    )
+    st.markdown(theme.steps(LANDING_STEPS), unsafe_allow_html=True)
+
+    st.markdown(
+        theme.section("选择模式", "进入后可在侧栏随时切回"), unsafe_allow_html=True
+    )
+    for column, card in zip(st.columns(2), LANDING_MODES):
+        with column, st.container(key=card["slot"]):
+            st.markdown(
+                theme.mode_card(
+                    card["icon"],
+                    card["title"],
+                    card["subtitle"],
+                    card["bullets"],
+                    card["tags"],
+                    badge=card["badge"],
+                ),
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                card["cta"],
+                key="enter_{}".format(card["mode"]),
+                width="stretch",
+                type="primary" if card["mode"] == MODE_GAME else "secondary",
+            ):
+                _enter_mode(card["mode"])
+
+    st.markdown(
+        theme.section("看到这些词不用慌", "站内术语对照，30 秒扫一遍就够"),
+        unsafe_allow_html=True,
+    )
+    st.markdown(theme.glossary(LANDING_GLOSS), unsafe_allow_html=True)
+
     st.divider()
     st.caption(
         "引擎 {}　存档格式 {}　进入后可在侧栏切回模式选择。".format(
             ENGINE_VERSION, RUN_SCHEMA_VERSION
         )
     )
+
 
 
 GAME_SETUP_KEY = "game_setup"
@@ -1554,23 +1634,20 @@ def _render_game_play() -> None:
     codes = st.session_state[GAME_CODES_KEY]
     setup = st.session_state[GAME_SETUP_KEY]
     prompt = runner.prompt()
-    position = prompt["index"] + 1
 
-    st.progress(
-        min(position - 1, len(codes)) / max(len(codes), 1),
-        text="第 {} / {} 局　·　已完成 {} 局　·　总得分 {}".format(
-            position, len(codes), len(matches),
+    # One strip for where the run and the match stand. The progress bar, the
+    # heading and the caption it replaces were three separate blocks that each
+    # restated the same position, and the bar could only count finished matches
+    # -- it said nothing about whether they went well.
+    st.markdown(
+        stage_strip(
+            len(codes),
+            [(m.player_score, m.opponent_score) for m in matches],
+            prompt["turn"], prompt["total_turns"],
             sum(m.player_score for m in matches),
         ),
+        unsafe_allow_html=True,
     )
-
-    st.markdown("#### 第 {} 局　第 {}/{} 轮".format(
-        position, prompt["turn"], prompt["total_turns"]))
-    # The encoding and its decoded modules are withheld during play. Hiding only
-    # the code would not help: "defects one turn after being defected on" tells
-    # the player strictly more than the raw encoding does. Both are revealed
-    # after the match so the player can still learn what they were facing.
-    st.caption("对手身份在本局结束前保密——先看它做了什么，再决定你怎么应对。")
 
     # The C/D string was unreadable: the letters had to be decoded and the two
     # sides sat on one line. A table with the words and the per-round payoff
@@ -1578,18 +1655,24 @@ def _render_game_play() -> None:
     _render_done_matches()
     played = len(runner.decisions)
     last = prompt["last_opponent"]
-    if last == "D":
-        st.info("对手上一轮背叛了——这一轮你打算怎么做？")
-    elif last == "C":
-        st.info("对手上一轮合作了。")
 
-    _score_bar(runner, played)
-
-    # The action buttons used to sit below the running history, so every extra
-    # turn pushed them further down the page and the player had to scroll to
-    # keep choosing. The primary decision now comes first and stays put; the
-    # history grows underneath it.
+    # Everything below is the *decision* panel, so it stops the moment the match
+    # ends. Left running, the settlement screen got a second 本局比分 -- its own
+    # plus this one -- and a cue pointing at buttons that were no longer there.
     if not runner.finished:
+        if last is not None:
+            st.markdown(action_cue(last), unsafe_allow_html=True)
+
+        _score_bar(runner, played)
+
+        # The action buttons used to sit below the running history, so every extra
+        # turn pushed them further down the page and the player had to scroll to
+        # keep choosing. The primary decision now comes first and stays put; the
+        # history grows underneath it.
+        # The two branches under each button price the choice: picking without
+        # seeing them means betting on a behaviour the player has to recall from
+        # the intro. The branch matching the opponent's last move is tinted, so
+        # the risk being taken is the one in front of them, not an abstraction.
         coop_col, defect_col = st.columns(2)
         with coop_col:
             with st.container(key="tf_move_coop"):
@@ -1598,12 +1681,14 @@ def _render_game_play() -> None:
                     decision = runner.play("C")
                     st.session_state["game_last"] = decision
                     st.rerun()
+                st.markdown(branch_strip("C", last), unsafe_allow_html=True)
         with defect_col:
             with st.container(key="tf_move_defect"):
                 if st.button("💥 背叛", key="play_d", width="stretch"):
                     decision = runner.play("D")
                     st.session_state["game_last"] = decision
                     st.rerun()
+                st.markdown(branch_strip("D", last), unsafe_allow_html=True)
 
     # The match finishing does *not* advance. Advancing here skipped the
     # settlement screen entirely: the next opponent's empty table appeared
@@ -2414,10 +2499,15 @@ def _score_bar(runner: PlayerMatchRunner, played: int) -> None:
         return
     my_run = runner.player_score
     their_run = runner.opponent_score
-    lead_word = "领先" if my_run > their_run else (
-        "落后" if my_run < their_run else "持平")
-    lead_colour = (theme.MUTUAL if my_run > their_run
-                   else (theme.DEFECT if my_run < their_run else theme.MUTED))
+    margin = my_run - their_run
+    lead_word = "领先 %d 分" % abs(int(margin)) if margin else "持平"
+    lead_colour = (theme.MUTUAL if margin > 0
+                   else (theme.DEFECT if margin < 0 else theme.MUTED))
+    # The bar splits the points the two have actually taken, so the score reads
+    # as a race rather than as two unrelated totals. Both sides can only be at
+    # zero before the first turn, which the guard above already excludes.
+    total = my_run + their_run
+    mine_share = my_run / total * 100 if total else 50
     st.markdown(
         "<div class='tf-score'>"
         "<span class='tf-score__label'>本局比分</span>"
@@ -2425,10 +2515,13 @@ def _score_bar(runner: PlayerMatchRunner, played: int) -> None:
         "<span class='tf-score__colon'>:</span>"
         "<span class='tf-score__them'>对手 <b>{}</b></span>"
         "<span class='tf-score__lead' style='color:{}'>{}</span>"
-        "<span class='tf-score__turn'>第 {} / {} 轮</span>"
+        "<div class='tf-score__split'>"
+        "<div class='tf-score__you-bar' style='width:{:.1f}%'></div>"
+        "<div class='tf-score__them-bar' style='width:{:.1f}%'></div>"
+        "</div>"
         "</div>".format(
             int(my_run), int(their_run), lead_colour, lead_word,
-            played, runner.turns,
+            mine_share, 100 - mine_share,
         ),
         unsafe_allow_html=True,
     )
