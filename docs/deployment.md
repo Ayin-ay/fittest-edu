@@ -51,6 +51,10 @@ APP_PASSWORD = "你的密码"
 
 ### 4.1 上传 GitHub 私有仓库
 
+> 本节是**历史记录**，仓库早已建好：远端为 `https://github.com/Ayin-ay/fittest-edu`，
+> 分支 `main`，且**目前是公开仓库**（匿名可 clone/读取 raw 文件）。当年设想的
+> 「转私有」并没有执行，下文 4.4 的图标仓库理由也已据此改写。要新建部署，直接看 4.2。
+
 ```bash
 cd "C:/Users/离众/Desktop/Trust Evolution"
 git init
@@ -68,8 +72,9 @@ git push -u origin main
 
 ### 4.2 部署
 
-1. 打开 <https://share.streamlit.io>，用 GitHub 登录并授权访问私有仓库。
-2. New app → 选择 `trust-evolution` 仓库与 `main` 分支。
+1. 打开 <https://share.streamlit.io>，用 GitHub 登录并授权访问仓库。
+2. New app → 选择 `Ayin-ay/fittest-edu` 仓库与 `main` 分支。
+   （首次部署会跳一次 GitHub 授权页，Authorise streamlit 里勾选该仓库。）
 3. **Main file path**：`dashboard/app.py`
 4. Advanced settings → **Sharing 选 "This app is public"**（不要选 Only specific people，
    这样朋友靠密码即可访问，无需邮箱白名单）。
@@ -97,7 +102,9 @@ git push -u origin main
    > 也不会下发到浏览器。
 
 6. Deploy，等待构建完成，得到形如 `https://<app>.streamlit.app` 的网址。
-   本应用当前地址为 **<https://fittest-edu.streamlit.app>**。
+   本仓库约定的子域是 **`fittest-edu`**，即 `https://fittest-edu.streamlit.app`
+   ——与 `ai_analysis.DEFAULT_APP_URL`、`share_card.QR_URL` 一致。**该应用尚未创建**，
+   建的时候就把子域填成这个；若同名已被占用，改掉子域后必须同步这三处。
 
    > 子域名在 Cloud 后台应用 Settings 里单独修改，**与 GitHub 仓库名无关**；
    > 改子域名会让旧网址失效，请尽早确定并只对外发布最终地址。
@@ -134,18 +141,29 @@ https://raw.githubusercontent.com/Ayin-ay/the-fittest-assets/main/icon.png
 
 因此任何需要「图标 URL」的第三方表单，都填上面那个公开仓库的直链。
 
-### 4.5 谁能打开这个网址
+### 4.5 线上状态怎么确认，以及怎么让合作者进来
 
-匿名访问 `https://fittest-edu.streamlit.app/` 会得到 303，跳转到
-`https://share.streamlit.io/-/auth/app?redirect_uri=…`，即 Cloud 的登录门；
-带浏览器 User-Agent 结果一致，所以这不是爬虫过滤。两种放行方式：
+**不要用 HTTP 探测来判断某个 `*.streamlit.app` 是否存在。** 实测一个必然不存在
+的子域（`zz-definitely-not-a-real-app-9x7q`）与真实应用返回完全相同的响应：
+
+- `GET /` → 303，跳 `https://share.streamlit.io/-/auth/app?redirect_uri=…`；
+- `GET /healthz` → 200。
+
+带浏览器 User-Agent 结果也一样。这两条只是 Cloud 边缘节点的通用行为，既不证明
+应用存在，也不证明它被设成了「仅成员可见」。**唯一可靠的确认方式是登录 Cloud 后台
+看应用列表。** 截至本次记录，本仓库在 Cloud 上还没有对应应用，
+`https://fittest-edu.streamlit.app` 只是代码与本文档约定的目标地址。
+
+应用建好之后，让合作者进来有两条路：
 
 - **加成员**：Cloud 后台 → 工作区 → Settings → Members → 邀请对方的 GitHub 账号。
-  网址保持仅成员可见。注意同一个工作区里的应用会一起可见。
+  网址保持仅成员可见。注意同一个工作区里的应用会一起可见——若不希望合作者看到
+  `the-fittest` 那个项目，两个应用要分属不同工作区。
 - **改公开**：该应用 → Settings → Who can access this app → Public。任何拿到
   网址的人都可直接进入，无需登录。
 
-无论走哪条，若线上 Secrets 设了 `APP_PASSWORD`，进去之后仍要再输一次访问密码。
+另外，若线上 Secrets 设了 `APP_PASSWORD`，进入页面后还要再输一次访问密码，
+需一并发给对方。
 
 ## 5. 常见问题
 
