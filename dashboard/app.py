@@ -1590,13 +1590,6 @@ def _game_finish(placeholder=None) -> None:
 
 def _render_game_setup() -> None:
     st.markdown("### 第一步：设置这一局")
-    st.caption(
-        "你将依次与 {} 个随机策略对局，每局 {} 轮。"
-        "每一步都要你自己选择合作或背叛——事后分析会逐步检查这些选择。".format(
-            st.session_state.get("game_opponents", 10),
-            st.session_state.get("game_turns", 10),
-        )
-    )
     count = st.slider("对手数量", 4, 12, 10, 1, key="game_opponents")
     turns = st.slider("每局轮数", 5, 20, 10, 1, key="game_turns")
     seed_text = st.text_input(
@@ -1604,7 +1597,20 @@ def _render_game_setup() -> None:
         help="同一种子会生成同一组对手，便于复现。",
         key="game_seed",
     )
-    if st.button("开始", type="primary", width="stretch"):
+
+    # Below the sliders, not above them: the summary used to sit on top and read
+    # the values out of session state, so on the very first paint it reported the
+    # defaults and then never matched what the player had just dragged to.
+    steps = count * turns
+    st.caption(
+        "共 {} 步决策（{} 局 × 每局 {} 轮）。按每步约 5 秒估算，约 {:.0f} 分钟。"
+        "每一步都要你自己选合作或背叛——事后分析会逐步检查这些选择。".format(
+            steps, count, turns, steps * 5 / 60)
+    )
+    # The stakes, at the moment they commit to them.
+    st.markdown(theme.payoff_chips(), unsafe_allow_html=True)
+
+    if st.button("开始这一局", type="primary", width="stretch"):
         try:
             seed = int(seed_text.strip())
         except ValueError:
