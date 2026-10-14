@@ -146,6 +146,34 @@ RELATIONSHIPS = {
 }
 
 
+def action_run(mine: str, theirs: str) -> str:
+    """Two aligned rows of one-pip-per-turn, for the many-matches overview.
+
+    ``history_table`` spells every turn out in words, which is right for one
+    match and far too much for ten. Here the reader only needs the shape of each
+    game -- when they cooperated, when the other side defected -- so each turn
+    becomes a dot and the two sides stack so columns stay on the same turn.
+    """
+    from dashboard import theme
+
+    def row(text: str) -> str:
+        pips = "".join(
+            "<i style='background:{}'></i>".format(
+                theme.COOP if mark == "C" else theme.DEFECT)
+            for mark in text
+        )
+        return "<div class='tf-run'>{}</div>".format(pips)
+
+    return (
+        "<div class='tf-runs'>"
+        "<span class='tf-run__key' style='color:{}'>你</span>{}"
+        "<span class='tf-run__key' style='color:{}'>对手</span>{}"
+        "</div>"
+    ).format(
+        theme.INK, row(mine), theme.MUTED, row(theirs),
+    )
+
+
 def _relationship(my_action: str, their_action: str) -> str:
     """Label one round by the pair of actions."""
     label, colour = RELATIONSHIPS[(my_action, their_action)]
@@ -349,6 +377,94 @@ def history_table(
         "<div style='color:" + colour + ";font-size:14px;font-weight:600;"
         "margin-top:4px'>" + summary + "</div></div>"
     )
+
+
+def matches_overview(matches: list[Match]) -> str:
+    """All finished matches in one compact table, the sequence drawn as pips.
+
+    The scores page used to hand ``st.dataframe`` the raw ``CDDCC`` strings,
+    which put back the very thing ``history_table`` exists to remove: a reader
+    has to decode each letter and cannot line the two rows up. Ten full
+    turn-by-turn tables would be just as unusable, so each match collapses to
+    one paired-pip line next to its numbers.
+    """
+    from dashboard import theme
+
+    def head_cell(label: str) -> str:
+        return (
+            "<th style='border-bottom:2px solid " + theme.LINE
+            + ";padding:6px 8px 6px 4px;color:" + theme.MUTED
+            + ";font-weight:600;text-align:left'>" + label + "</th>"
+        )
+
+    rows = []
+    for match in matches:
+        margin = match.player_score - match.opponent_score
+        verdict, colour = (
+            ("领先", theme.MUTUAL) if margin > 0
+            else ("落后", theme.DEFECT) if margin < 0
+            else ("持平", theme.MUTED)
+        )
+        rows.append(
+            "<tr>"
+            "<td style='padding:7px 8px 7px 4px;text-align:center;color:"
+            + theme.MUTED + "'>{}</td>"
+            "<td style='padding:7px 8px'><b>{}</b><div style='color:{};"
+            "font-size:13px'>{}</div></td>"
+            "<td style='padding:7px 8px'>{}</td>"
+            "<td style='padding:7px 8px;white-space:nowrap'><b style='color:{}'>{}</b>"
+            "<span style='color:{}'> / {}</span></td>"
+            "<td style='padding:7px 8px;color:{};font-weight:600;white-space:nowrap'>{}</td>"
+            "<td style='padding:7px 8px;text-align:right'>{}</td>"
+            "</tr>".format(
+                match.index + 1, match.opponent, theme.MUTED, match.opponent_label,
+                action_run(match.player_actions, match.opponent_actions),
+                theme.INK, _whole(match.player_score),
+                theme.MUTED, _whole(match.opponent_score),
+                colour, verdict, match.mutual_cooperations,
+            )
+        )
+
+    return (
+        "<div style='overflow-x:auto;margin:0.4rem 0 0.8rem'>"
+        "<table style='border-collapse:collapse;width:100%;font-size:15px'>"
+        "<thead><tr>"
+        + head_cell("局") + head_cell("对手") + head_cell("出牌<br>你 / 对手")
+        + head_cell("得分<br>你 / 对手") + head_cell("结果") + head_cell("互相<br>合作轮数")
+        + "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+    )
+
+
+def identity_card(code: str) -> str:
+    """The opponent's identity, revealed once its match is over.
+
+    It used to be a ``st.container(border=True)`` holding a bullet list, which
+    read as raw parser output -- 默认槽 / 触发槽1 as list items, no visual
+    grouping, and the code string lost at the end of a caption. Here the code
+    and the label come first as the card's spine, and each module is a row with
+    its slot as a chip so the three kinds stay distinguishable at a glance.
+    """
+    from dashboard import theme
+    from dashboard.strategy_detail import parse_strategy_detail
+
+    rows = []
+    for slot, module_name, text in parse_strategy_detail(code):
+        rows.append(
+            "<div class='tf-rule'>"
+            "<span class='tf-rule__slot'>{}</span>"
+            "<div class='tf-rule__body'><b>{}</b><span>{}</span></div>"
+            "</div>".format(slot, module_name, text)
+        )
+    return (
+        "<div class='tf-ident'>"
+        "<div class='tf-ident__head'>"
+        "<span class='tf-ident__kicker'>本局对手</span>"
+        "<b class='tf-ident__code'>{}</b>"
+        "<span class='tf-ident__label'>{}</span>"
+        "</div>{}<div class='tf-ident__note'>"
+        "规则在它这一局结束前一直保密；现在可以对照上面的「本局记录」回看它每一步为什么这么出。</div>"
+        "</div>"
+    ).format(code, opponent_label(code), "".join(rows))
 
 
 def draw_opponents(count: int, seed: int) -> list[str]:

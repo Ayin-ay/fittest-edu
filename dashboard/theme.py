@@ -814,6 +814,90 @@ a { color: #2E7DE4; }
   background: #2E7DE4;
   box-shadow: 0 0 0 3px rgba(46,125,228,.16);
 }
+/* The per-match sequences on the results page: one dot per turn, your row
+   directly above the opponent's so both columns are the same turn. Raw C/D
+   letters asked the reader to decode ten strings at once. */
+.tf-runs {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 3px 9px;
+  align-items: center;
+}
+.tf-run__key {
+  font-size: .73rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.tf-run { display: flex; gap: 4px; }
+.tf-run i {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(36,31,26,.08);
+}
+/* The settlement reveal: who the opponent was, module by module. */
+.tf-ident {
+  background: #FFFDF9;
+  border: 1px solid #E4DACA;
+  border-radius: 14px;
+  padding: .85rem 1rem .95rem;
+}
+.tf-ident__head {
+  display: flex;
+  align-items: baseline;
+  gap: .55rem;
+  flex-wrap: wrap;
+  padding-bottom: .6rem;
+  border-bottom: 1px solid #EFE6D6;
+}
+.tf-ident__kicker {
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: #6B6156;
+}
+.tf-ident__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .9rem;
+  color: #241F1A;
+}
+.tf-ident__label {
+  font-size: .8rem;
+  color: #6B6156;
+  background: #F2EADB;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.tf-rule {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .6rem;
+  align-items: start;
+  padding: .5rem 0;
+  border-bottom: 1px dashed #EFE6D6;
+}
+.tf-rule:last-of-type { border-bottom: 0; }
+.tf-rule__slot {
+  font-size: .72rem;
+  font-weight: 700;
+  color: #6B6156;
+  background: #F6F0E6;
+  border-radius: 5px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  margin-top: .15rem;
+}
+.tf-rule__body { font-size: .86rem; line-height: 1.5; }
+.tf-rule__body b { color: #241F1A; margin-right: .35rem; }
+.tf-rule__body span { color: #6B6156; }
+.tf-ident__note {
+  margin-top: .55rem;
+  font-size: .78rem;
+  line-height: 1.5;
+  color: #8A8073;
+}
 .tf-track {
   height: .4rem;
   border-radius: 999px;

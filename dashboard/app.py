@@ -117,6 +117,8 @@ from dashboard.gameplay import (  # noqa: E402
     build_results_figure,
     draw_opponents,
     history_table,
+    identity_card,
+    matches_overview,
     stage_strip,
     strategy_tournament,
 )
@@ -171,7 +173,6 @@ from dashboard.render_helpers import (  # noqa: E402
 )
 
 from dashboard.naming import build_name_map  # noqa: E402
-from dashboard.strategy_detail import parse_strategy_detail  # noqa: E402
 
 DEFAULT_CUSTOM = "S1,25\nS2,20\nF1-1,15\nF2-3,15\nT1-2,10\nD0,10\nW,5"
 
@@ -1714,18 +1715,16 @@ def _render_game_play() -> None:
         # the button to move on. The live table below is skipped in this branch
         # -- rendering both produced two copies of the same record on one page.
         _render_completed_match(prompt, runner)
-        reveal_col, next_col = st.columns(2)
+        # The last settlement must not offer 下一局: the run has one screen left,
+        # and a player who pressed the always-same label expected another opponent
+        # and got a report instead.
+        is_last = len(matches) + 1 >= len(codes)
+        reveal_col, next_col = st.columns([3, 2], vertical_alignment="bottom")
         with reveal_col:
-            with st.container(border=True):
-                st.markdown("**本局对手身份**")
-                st.caption("`{}`　行为标签 {}".format(
-                    prompt["opponent"], prompt["opponent_label"]))
-                for slot, name, text in parse_strategy_detail(
-                    prompt["opponent"]
-                ):
-                    st.markdown("- **[{}] {}** — {}".format(slot, name, text))
+            st.markdown(identity_card(prompt["opponent"]), unsafe_allow_html=True)
         with next_col:
-            if st.button("进入下一局", type="primary", width="stretch"):
+            label = "查看成绩与行为分析" if is_last else "进入下一局"
+            if st.button(label, type="primary", width="stretch"):
                 _game_advance()
                 st.rerun()
         return
@@ -1867,10 +1866,6 @@ def _render_completed_match(prompt: dict, runner: PlayerMatchRunner) -> None:
         ),
         unsafe_allow_html=True,
     )
-    st.caption(
-        "本局 {} 分　:　{} 分".format(
-            int(finished.player_score), int(finished.opponent_score))
-    )
 
 
 def _render_game_results() -> None:
@@ -1879,11 +1874,17 @@ def _render_game_results() -> None:
     st.markdown("### 你的成绩")
     metric_a, metric_b, metric_c = st.columns(3)
     metric_a.metric("总局分", "{:.0f}".format(results["player_total"]))
-    metric_b.metric("每局平均", "{:.1f}".format(results["player_average"]))
-    metric_c.metric("策略平均", "{:.1f}".format(results["field_average"]))
-    verdict = "高于" if results["player_average"] > results["field_average"] else "低于"
-    st.caption(
-        "你的每局平均分 {} 策略的平均分（{:.1f}）。".format(verdict, results["field_average"])
+    metric_b.metric(
+        "每局平均", "{:.1f}".format(results["player_average"]),
+        delta="{:+.1f} vs 策略平均".format(
+            results["player_average"] - results["field_average"]),
+        help="你的每局平均分，与 {} 个策略彼此对局平均分的差距。".format(
+            len(results["table"]) - 1),
+    )
+    metric_c.metric(
+        "策略平均", "{:.1f}".format(results["field_average"]),
+        help="{} 个策略两两对局后的平均总分，作为你的参照线。".format(
+            len(results["table"]) - 1),
     )
 
     st.plotly_chart(build_results_figure(results), width="stretch")
@@ -1905,19 +1906,8 @@ def _render_game_results() -> None:
 
     st.divider()
     st.markdown("### 逐局记录")
-    st.dataframe(
-        [{
-            "局": match.index + 1,
-            "对手": match.opponent,
-            "标签": match.opponent_label,
-            "你": match.player_actions,
-            "对手": match.opponent_actions,
-            "你的得分": match.player_score,
-            "对手得分": match.opponent_score,
-            "互相合作轮数": match.mutual_cooperations,
-        } for match in profile["matches"]],
-        width="stretch", hide_index=True,
-    )
+    st.caption("蓝点为合作，橙点为背叛。上下两行同一列即同一轮，逐局明细请看每一局的「本局记录」。")
+    st.markdown(matches_overview(profile["matches"]), unsafe_allow_html=True)
 
     st.divider()
     if st.button("查看行为分析", type="primary", width="stretch"):
