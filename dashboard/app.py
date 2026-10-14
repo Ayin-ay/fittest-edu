@@ -1803,11 +1803,9 @@ def _render_done_matches() -> None:
                 int(match.opponent_score))
         )
     st.markdown("### 已完成的局")
-    total_you = sum(row["你"] for row in done)
-    total_them = sum(row["对手分"] for row in done)
     head = (
         "<div style='overflow-x:auto;margin:0.2rem 0 0.6rem'>"
-        "<table style='border-collapse:collapse;width:100%;font-size:14px'>"
+        "<table style='border-collapse:collapse;width:100%;max-width:520px;font-size:15px'>"
         "<thead><tr>"
         "<th style='text-align:left;padding:5px 6px;border-bottom:2px solid " + theme.LINE
         + ";color:" + theme.MUTED + "'>局</th>"
@@ -1824,21 +1822,17 @@ def _render_done_matches() -> None:
             theme.DEFECT if gap < 0 else theme.MUTED)
         body.append(
             "<tr>"
-            "<td style='padding:4px 6px'>{}</td>"
+            "<td style='padding:4px 6px;color:" + theme.MUTED + "'>{}</td>"
             "<td style='padding:4px 6px'>{}</td>"
             "<td style='padding:4px 6px;text-align:center;font-weight:700;"
             "color:{}'>{} : {}</td>"
             "</tr>".format(row["局次"], row["对手"], colour, row["你"],
                            row["对手分"])
         )
-    tail = (
-        "</tbody></table>"
-        "<div style='color:" + theme.MUTED + ";font-size:13px;margin-top:4px'>"
-        "累计 <b style='color:" + theme.INK + "'>" + str(total_you) + "</b>"
-        " : " + "<b style='color:" + theme.INK + "'>" + str(total_them) + "</b>"
-        "</div></div>"
-    )
-    st.markdown(head + "".join(body) + tail, unsafe_allow_html=True)
+    # No 累计 line here: the stage strip above already carries the running total,
+    # and this ledger's job is the per-opponent split the strip cannot show.
+    st.markdown(head + "".join(body) + "</tbody></table></div>",
+                unsafe_allow_html=True)
 
     with st.expander("回看每一局的决策记录", expanded=False):
         st.caption("展开任意一局，可以看双方每一轮选了什么、拿到多少分。")
