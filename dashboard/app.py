@@ -1033,6 +1033,19 @@ def render_events(
         )
 
 
+def _alive_count(record) -> int:
+    """Species still standing in one generation record."""
+    alive = 0
+    for data in record.species_data.values():
+        subspecies = data.get("subspecies")
+        total = data.get("population_size", 0) + (
+            subspecies["size"] if subspecies else 0
+        )
+        if total > 0:
+            alive += 1
+    return alive
+
+
 def render_main() -> None:
     simulation = st.session_state.get("sim")
     if simulation is None:
@@ -1067,17 +1080,25 @@ def render_main() -> None:
     view_gen = st.session_state["view_gen"]
     record = simulation.generation_records[view_gen]
 
-    alive = 0
-    for data in record.species_data.values():
-        subspecies = data.get("subspecies")
-        total = data.get("population_size", 0) + (
-            subspecies["size"] if subspecies else 0
-        )
-        if total > 0:
-            alive += 1
+    alive = _alive_count(record)
+    previous = (
+        simulation.generation_records[view_gen - 1] if view_gen > 0 else None)
     metric_a, metric_b, metric_c = st.columns(3)
-    metric_a.metric("存活策略", alive)
-    metric_b.metric("平均适应度", f"{record.average_fitness:.2f}")
+    # Both carry the change against the previous round. ``delta_color="off"`` for
+    # 存活策略 on purpose: one fewer strategy standing is extinction, which is the
+    # subject of the simulation, not a failure of it -- and the plain grey of
+    # ``delta_color`` keeps the two from reading as good and bad news.
+    metric_a.metric(
+        "存活策略", alive,
+        delta=None if previous is None else "{:+d} 较上一轮".format(
+            alive - _alive_count(previous)),
+        delta_color="off",
+    )
+    metric_b.metric(
+        "平均适应度", "{:.2f}".format(record.average_fitness),
+        delta=None if previous is None else "{:+.2f} 较上一轮".format(
+            record.average_fitness - previous.average_fitness),
+    )
     metric_c.metric("本轮特殊事件", len(events_at(simulation, view_gen, names)))
 
     render_events(simulation, view_gen, names)
