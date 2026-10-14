@@ -89,7 +89,6 @@ from dashboard.export import (  # noqa: E402
     RUNS_DIR,
     build_export_bundle,
     bundle_to_markdown,
-    load_document,
     save_markdown_report,
 )
 from dashboard.saveload import (  # noqa: E402
@@ -1232,10 +1231,9 @@ def render_main() -> None:
             st.session_state["export_doc"] = bundle
             st.session_state["export_md"] = bundle_to_markdown(bundle)
 
-        # Saving is kept; the "hand it to the AI" button is not. The creation
-        # mode reads the run in place from the visitor's own wallet, so exporting
-        # a file and submitting it by hand is now a second way to reach the same
-        # report. The code that path used is left below, unused but intact.
+        # Saving is the only action here: the run is already in session state, so
+        # 大模型解读这场演化 reads it in place. Exporting a file and submitting it
+        # by hand would be a second way to reach the same report.
         if st.button("💾 保存统一存档", width="stretch", type="primary"):
             saved = save_markdown_report(
                 simulation, st.session_state.get("seed"),
@@ -1248,45 +1246,11 @@ def render_main() -> None:
                 f"位置 {saved}　引擎 {ENGINE_VERSION}。"
                 "这个文件也可以直接分享——对方上传即可复现。"
             )
-        if False:
-            if st.button("📊 保存并交给 AI", width="stretch"):
-                path = save_markdown_report(
-                    simulation, st.session_state.get("seed"), simulation.generation,
-                    name=run_name or "run",
-                    note=run_note or None,
-                )
-                try:
-                    doc = load_document(path)
-                    st.session_state["latest_analysis_report"] = {
-                        "path": str(path),
-                        "text": bundle_to_markdown(doc),
-                        "meta": doc["summary"],
-                        "engine_version": doc["engine_version"],
-                    }
-                except Exception as error:  # noqa: BLE001 - surface message to user
-                    st.error(f"读取失败：{error}")
-                else:
-                    st.success(f"已保存统一存档：{path.name}")
 
-        if st.session_state.get("latest_analysis_report"):
-            info = st.session_state["latest_analysis_report"]
-            with st.expander("📄 已保存的存档（AI 将读这份数据）", expanded=False):
-                st.code(info["path"], language="text")
-                st.caption(
-                    "引擎版本 {}　种子 {}　代数 {}　手动注入 {} 次".format(
-                        info.get("engine_version"),
-                        (info.get("meta") or {}).get("seed"),
-                        (info.get("meta") or {}).get("generations"),
-                        (info.get("meta") or {}).get("injections"),
-                    )
-                )
-                st.text_area(
-                    "下面是从该存档渲染出的 Markdown 视图（仅供人读；"
-                    "AI 直接读同目录的 .tev.json 即可，无需依赖这段文本）：",
-                    info["text"],
-                    height=240,
-                )
-        elif st.toggle("预览 Markdown 视图"):
+        # The preview comes from the bundle built above, not from a file that was
+        # written and read back -- one source, so the panel and the preview
+        # cannot drift apart.
+        if st.toggle("预览 Markdown 视图"):
             st.markdown(st.session_state["export_md"])
 
     render_strategy_detail_float(
