@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import sqlite3
 import sys
 import zlib
 from pathlib import Path
@@ -108,6 +109,7 @@ from dashboard.ai_analysis import (  # noqa: E402
     stream_analysis as ai_stream,
 )
 from dashboard import evolution_analysis  # noqa: E402
+from dashboard import store  # noqa: E402
 from dashboard import theme  # noqa: E402
 from dashboard.gameplay import (  # noqa: E402
     PlayerMatchRunner,
@@ -187,14 +189,19 @@ PIN_OPTIONS = {
 PIN_LABELS = {value: label for label, value in PIN_OPTIONS.items() if value}
 
 
-def _configured_password() -> str | None:
-    """Read APP_PASSWORD from st.secrets (or env). None means no gate."""
+def _configured_secret(name: str) -> str | None:
+    """Read a secret from st.secrets (or the environment). None means unset."""
     value = None
     try:
-        value = st.secrets.get("APP_PASSWORD")
+        value = st.secrets.get(name)
     except Exception:  # no secrets file configured
         value = None
-    return value or os.getenv("APP_PASSWORD") or None
+    return value or os.getenv(name) or None
+
+
+def _configured_password() -> str | None:
+    """Read APP_PASSWORD from st.secrets (or env). None means no gate."""
+    return _configured_secret("APP_PASSWORD")
 
 
 def check_password() -> bool:
@@ -1303,6 +1310,97 @@ def _enter_mode(mode: str) -> None:
     st.rerun()
 
 
+def _render_roster_panel() -> None:
+    """名单导出 / 导入——免费版文件系统是临时的，这条路径是唯一的兜底。
+
+    需要 ``TEACHER_GATE`` 才展开。名单里每一行都是一个学生取回自己报告的唯一凭据，
+    而访问密码是全班共用的：不加这道门，任何一个同学都能在这里看到（并逐个输入）
+    所有人的加入码。没配教师码时整块数据都不渲染，而不是"默认给大家看"。
+
+    刻意不做账号体系，也不在这张表里放任何能指认到人的列：导出的 CSV 只有加入码、
+    班级码、设置和决策串。九项测量和比分不落库，收到 CSV 的人重新算即可，所以这份
+    文件既是备份，也不会变成一份"看起来像心理档案"的数据。
+    """
+    gate = _configured_secret("TEACHER_GATE")
+    with st.expander("教师端：整批名单导出与恢复", expanded=False):
+        if not gate:
+            st.caption(
+                "未配置教师码（Secrets 或环境变量 ``TEACHER_GATE``），名单默认不公开。"
+                "加入码是学生取回自己报告的唯一凭据，而访问密码全班共用，所以这一屏"
+                "单独设一道门。"
+            )
+            return
+        if st.session_state.get("teacher_unlocked") is not True:
+            code_col, button_col = st.columns([3, 1], vertical_alignment="bottom")
+            with code_col:
+                typed = st.text_input(
+                    "教师码", type="password", key="teacher_gate_input",
+                    label_visibility="collapsed", placeholder="教师码",
+                )
+            with button_col:
+                if st.button("解锁", key="teacher_gate_btn", width="stretch"):
+                    if typed == gate:
+                        st.session_state["teacher_unlocked"] = True
+                        st.rerun()
+                    else:
+                        st.error("教师码不对")
+            return
+
+        try:
+            runs = store.list_runs()
+        except (sqlite3.Error, OSError) as error:
+            st.warning("名单库暂时读不出来：{}".format(error))
+            return
+
+        if not runs:
+            st.caption("名单库还是空的。学生开始一局后这里就会有记录。")
+        else:
+            playing = sum(1 for run in runs if run["status"] == "playing")
+            finished = len(runs) - playing
+            classes = {run["class_code"] for run in runs if run["class_code"]}
+            st.caption(
+                "共 {} 局：已完成 {}、进行中 {}；班级码 {} 个。".format(
+                    len(runs), finished, playing, len(classes))
+            )
+            st.dataframe(
+                [
+                    {
+                        "加入码": run["join_code"],
+                        "班级码": run["class_code"] or "—",
+                        "状态": "已完成" if run["status"] == "finished" else "进行中",
+                        "局数": run["count"],
+                        "每局轮数": run["turns"],
+                        "已打决策": sum(len(a) for a in run["actions"]),
+                        "更新时间": run["updated_at"],
+                    }
+                    for run in runs
+                ],
+                width="stretch", hide_index=True,
+            )
+
+        out_col, in_col = st.columns(2)
+        with out_col:
+            st.download_button(
+                "⬇ 导出名单 CSV",
+                data=store.export_csv(),
+                file_name="fittest-roster.csv",
+                mime="text/csv",
+                width="stretch",
+                disabled=not runs,
+                help="UTF-8 带 BOM，Excel 直接打开不乱码。",
+            )
+        with in_col:
+            upload = st.file_uploader("上传此前导出的 CSV", type="csv", key="roster_csv")
+            if upload is not None and st.button("恢复这批名单", key="roster_import"):
+                try:
+                    count = store.import_csv(upload.getvalue())
+                except (ValueError, sqlite3.Error, OSError) as error:
+                    st.error("导入失败：{}".format(error))
+                else:
+                    st.success(
+                        "已恢复 {} 条记录。加入码不变，学生照常凭码回来。".format(count))
+
+
 def render_mode_select() -> None:
     """Entry screen: what this site is, then which way in."""
     st.markdown(SPLASH_CSS, unsafe_allow_html=True)
@@ -1382,6 +1480,8 @@ def render_mode_select() -> None:
     )
     st.markdown(theme.glossary(LANDING_GLOSS), unsafe_allow_html=True)
 
+    _render_roster_panel()
+
     st.divider()
     st.caption(
         "引擎 {}　存档格式 {}　进入后可在侧栏切回模式选择。".format(
@@ -1405,9 +1505,19 @@ GAME_AI_OVERVIEW_KEY = "game_ai_overview"
 GAME_TUTORIAL_KEY = "game_tutorial"
 GAME_TUTORIAL_DONE = "game_tutorial_done"
 TUTORIAL_RUNNER_KEY = "game_tutorial_runner"
+#: 学生凭以回来继续的加入码。由 :mod:`dashboard.store` 分配，只存在这一处。
+GAME_JOIN_KEY = "game_join_code"
+#: 「用加入码继续」输入框。
+RESUME_CODE_KEY = "resume_code"
+#: 设置页上的班级码输入框。
+CLASS_CODE_KEY = "class_code"
+#: 名单库最近一次写入失败的原因，用于在界面上一句话说明，而不是让对局崩掉。
+STORE_ERROR_KEY = "store_error"
 
 #: URL 参数名，用来把对局进度带在地址栏里。
 GAME_PARAM = "g"
+#: 第二个参数：加入码。没有它的话，刷新一次就只剩 URL 能救这一局、名单库不再更新。
+GAME_JOIN_PARAM = "gc"
 _PAYLOAD_VERSION = "v1"
 
 
@@ -1431,6 +1541,20 @@ def _match_summary(finished) -> dict:
     }
 
 
+def _played_actions() -> list[str]:
+    """玩家自己的决策，每局一段，最后一段可能还没打完。
+
+    URL 恢复和 SQLite 名单存的是同一份东西——两者都只是重放的种子，比分和
+    九项测量一律重新算出来。分开写就会出现"地址栏里那局和数据库里那局不是
+    同一局"这种查无可查的分歧。
+    """
+    acts = [m.player_actions for m in (st.session_state.get(GAME_MATCHES_KEY) or [])]
+    runner = st.session_state.get(GAME_RUNNER_KEY)
+    if runner is not None:
+        acts.append("".join(decision.action for decision in runner.decisions))
+    return acts
+
+
 def _game_payload() -> str | None:
     """把整局编码成 ``v1.对手数.轮数.种子.各局决策``。
 
@@ -1442,59 +1566,20 @@ def _game_payload() -> str | None:
     codes = st.session_state.get(GAME_CODES_KEY)
     if not setup or not codes:
         return None
-    acts = [m.player_actions for m in (st.session_state.get(GAME_MATCHES_KEY) or [])]
-    runner = st.session_state.get(GAME_RUNNER_KEY)
-    if runner is not None:
-        acts.append("".join(decision.action for decision in runner.decisions))
     return ".".join(
         [_PAYLOAD_VERSION, str(setup["count"]), str(setup["turns"]), str(setup["seed"])]
-        + acts
+        + _played_actions()
     )
 
 
-def _query_value(key: str) -> str | None:
-    """``st.query_params`` 对重复键会返回列表，这里统一取单个字符串。"""
-    value = st.query_params.get(key)
-    if isinstance(value, list):
-        value = value[0] if value else None
-    return value
+def _replay_run(count: int, turns: int, seed: int, acts: list[str], *,
+                join_code: str | None = None) -> None:
+    """从"设置 + 玩家决策"重放出一局，填好 session_state。
 
-
-def _persist_game() -> None:
-    """把当前进度镜像进 URL。值没变时不写，避免多余的重跑。"""
-    payload = _game_payload()
-    if payload and _query_value(GAME_PARAM) != payload:
-        st.query_params[GAME_PARAM] = payload
-
-
-def _clear_persisted_game() -> None:
-    if GAME_PARAM in st.query_params:
-        del st.query_params[GAME_PARAM]
-
-
-def _restore_game_from_url() -> None:
-    """把地址栏里带着的一局重放出来。
-
-    没有这一步，刷新或重新打开浏览器就会回到设置页——玩家刚打完的十局连同成绩
-    一起消失。这曾经是最难察觉的坑：数据看起来"没了"，而用户以为是自己的问题。
+    地址栏恢复和加入码恢复共用它：确定性的引擎意味着只要喂回同样的种子和同样
+    的决策，重放出来的对手、比分与九项测量必然和原局一致——所以存的从来不是
+    报告，而是产生报告的那几步选择。
     """
-    if st.session_state.get(GAME_SETUP_KEY):
-        return
-    payload = _query_value(GAME_PARAM)
-    if not payload:
-        return
-
-    parts = payload.split(".")
-    if len(parts) < 4 or parts[0] != _PAYLOAD_VERSION:
-        _clear_persisted_game()
-        return
-    try:
-        count, turns, seed = int(parts[1]), int(parts[2]), int(parts[3])
-    except ValueError:
-        _clear_persisted_game()
-        return
-    acts = parts[4:]
-
     codes = draw_opponents(count, seed)
     matches: list = []
     done: list = []
@@ -1522,6 +1607,8 @@ def _restore_game_from_url() -> None:
     st.session_state[GAME_DONE_KEY] = done
     st.session_state[GAME_RUNNER_KEY] = runner
     st.session_state["app_mode"] = MODE_GAME
+    if join_code:
+        st.session_state[GAME_JOIN_KEY] = join_code
     # 恢复出来的一局必然已经过了教学，否则每刷新一次都要重学一遍。
     st.session_state[GAME_TUTORIAL_DONE] = True
 
@@ -1532,17 +1619,127 @@ def _restore_game_from_url() -> None:
         st.session_state["game_phase"] = "play"
 
 
-def _game_start(count: int, turns: int, seed: int) -> None:
-    """Deal opponents and prime the first match."""
+def _restore_game_from_url() -> None:
+    """把地址栏里带着的一局重放出来。
+
+    没有这一步，刷新或重新打开浏览器就会回到设置页——玩家刚打完的十局连同成绩
+    一起消失。这曾经是最难察觉的坑：数据看起来"没了"，而用户以为是自己的问题。
+    """
+    if st.session_state.get(GAME_SETUP_KEY):
+        return
+    payload = _query_value(GAME_PARAM)
+    if not payload:
+        return
+
+    parts = payload.split(".")
+    if len(parts) < 4 or parts[0] != _PAYLOAD_VERSION:
+        _clear_persisted_game()
+        return
+    try:
+        count, turns, seed = int(parts[1]), int(parts[2]), int(parts[3])
+    except ValueError:
+        _clear_persisted_game()
+        return
+
+    # 地址栏里的码可能已经不在库里了——免费版每次重新部署都会清空文件。这串码此
+    # 时是那一局唯一的凭据，按 URL 自带的设置重新登记，之后的进度才有人接着收。
+    join_code = _query_value(GAME_JOIN_PARAM)
+    if join_code:
+        try:
+            if store.load_run(join_code) is None:
+                store.create_run(
+                    join_code, class_code="", opponent_count=count, turns=turns,
+                    seed=seed, engine_version=ENGINE_VERSION, tutorial_done=True,
+                )
+        except (sqlite3.Error, OSError) as error:
+            st.session_state[STORE_ERROR_KEY] = str(error)
+            join_code = None
+
+    _replay_run(count, turns, seed, parts[4:], join_code=join_code)
+
+
+def _persist_store() -> None:
+    """把当前进度写进名单库。
+
+    和 :func:`_persist_game` 在同一个位置调用，因此两条恢复路径的覆盖范围一致。
+    每步决策后都会重跑，所以这里不需要单独找地方"另存"。
+    """
+    code = st.session_state.get(GAME_JOIN_KEY)
+    setup = st.session_state.get(GAME_SETUP_KEY)
+    codes = st.session_state.get(GAME_CODES_KEY)
+    if not code or not setup or not codes:
+        return
+    matches = st.session_state.get(GAME_MATCHES_KEY) or []
+    try:
+        store.save_progress(
+            code,
+            actions=_played_actions(),
+            tutorial_done=bool(st.session_state.get(GAME_TUTORIAL_DONE)),
+            status="finished" if len(matches) >= len(codes) else "playing",
+        )
+    except (sqlite3.Error, OSError) as error:
+        # 写不进库不能打断对局：进度还在地址栏里，学生至少能打完这一轮。
+        st.session_state[STORE_ERROR_KEY] = str(error)
+
+
+def _query_value(key: str) -> str | None:
+    """``st.query_params`` 对重复键会返回列表，这里统一取单个字符串。"""
+    value = st.query_params.get(key)
+    if isinstance(value, list):
+        value = value[0] if value else None
+    return value
+
+
+def _persist_game() -> None:
+    """把当前进度镜像进 URL。值没变时不写，避免多余的重跑。
+
+    加入码跟着一起走 ``gc`` 参数：刷新后如果只恢复了局面、没恢复那个码，这一局
+    就又回到"只活在会话里"，名单库里那行会永远停在中断时的进度。
+    """
+    payload = _game_payload()
+    if payload and _query_value(GAME_PARAM) != payload:
+        st.query_params[GAME_PARAM] = payload
+    code = st.session_state.get(GAME_JOIN_KEY)
+    if code and _query_value(GAME_JOIN_PARAM) != code:
+        st.query_params[GAME_JOIN_PARAM] = code
+
+
+def _clear_persisted_game() -> None:
+    for param in (GAME_PARAM, GAME_JOIN_PARAM):
+        if param in st.query_params:
+            del st.query_params[param]
+
+
+def _game_start(count: int, turns: int, seed: int, class_code: str = "") -> None:
+    """Deal opponents, prime the first match, and register the run in the store.
+
+    The join code is allocated here rather than at the first decision because a
+    student who opens the page and gets diverted still has something to come
+    back with -- and because the code is the only handle they ever get on their
+    own data.
+    """
     codes = draw_opponents(count, seed)
     st.session_state[GAME_CODES_KEY] = codes
     st.session_state[GAME_MATCHES_KEY] = []
+    st.session_state[GAME_DONE_KEY] = []
     st.session_state[GAME_RESULTS_KEY] = None
     st.session_state[GAME_PROFILE_KEY] = None
+    st.session_state[GAME_AI_KEY] = None
     st.session_state["game_phase"] = "play"
     st.session_state[GAME_RUNNER_KEY] = PlayerMatchRunner(
         index=0, opponent=codes[0], turns=turns, seed=seed + 1
     )
+    # 分不到码就照常开局：对局本身不依赖名单库，缺的只是"下周还能回来"。
+    try:
+        join_code = store.new_join_code()
+        store.create_run(
+            join_code, class_code=class_code, opponent_count=count, turns=turns,
+            seed=seed, engine_version=ENGINE_VERSION,
+            tutorial_done=bool(st.session_state.get(GAME_TUTORIAL_DONE)),
+        )
+        st.session_state[GAME_JOIN_KEY] = join_code
+    except (sqlite3.Error, OSError, RuntimeError) as error:
+        st.session_state[STORE_ERROR_KEY] = str(error)
 
 
 def _game_advance() -> None:
@@ -1610,6 +1807,15 @@ def _render_game_setup() -> None:
     # The stakes, at the moment they commit to them.
     st.markdown(theme.payoff_chips(), unsafe_allow_html=True)
 
+    # 老师自己起的分组标签，用来把同一次课的名单聚到一起。它不是学生名册：这张
+    # 表里没有、也不该有姓名之类能指认到人的东西。
+    class_code = st.text_input(
+        "班级码（可留空）",
+        placeholder="例如 计科231 或 10-14下午班",
+        help="只用于把同一批人的对局归到一起，教师端看板按它筛选。不填也能玩。",
+        key=CLASS_CODE_KEY,
+    )
+
     if st.button("开始这一局", type="primary", width="stretch"):
         try:
             seed = int(seed_text.strip())
@@ -1617,7 +1823,49 @@ def _render_game_setup() -> None:
             st.error("种子必须是整数")
             return
         st.session_state[GAME_SETUP_KEY] = {"count": count, "turns": turns, "seed": seed}
-        _game_start(count, turns, seed)
+        _game_start(count, turns, seed, class_code.strip()[:24])
+        st.rerun()
+
+
+def _render_resume_box() -> None:
+    """凭加入码回来继续：不需要账号、密码，也不需要姓名。
+
+    没有活动对局时就显示，包括教学之前——上周打到一半的学生这周不该为了输一串
+    码而重新学一遍规则。
+    """
+    st.markdown("#### 接着上次打")
+    code = st.text_input(
+        "加入码", placeholder="8 位字母数字，形如 K7QM2XNB",
+        key=RESUME_CODE_KEY,
+        help="开始对局后页面会给出加入码；抄下这串码，或收藏当时那个链接，都能回来继续。",
+    )
+    if st.button("用加入码继续", key="resume_run"):
+        if not (code or "").strip():
+            st.error("先输入加入码再点这张按钮。码显示在游戏页顶部，形如 WC4PX2YC。")
+            return
+        try:
+            run = store.load_run(code)
+        except (sqlite3.Error, OSError) as error:
+            st.error("名单库现在读不出来：{}".format(error))
+            return
+        if run is None:
+            st.error(
+                "找不到加入码「{}」。核对一下有没有抄错——I、O、0、1 这四个字符不会出现在加入码里。".format(
+                    store.normalize_code(code))
+            )
+            return
+        if run["engine_version"] != ENGINE_VERSION:
+            # 跨版本的存档不重放：引擎改了收益或生成规则，同一串决策会算出一份
+            # 不同的报告，而那份看起来完全正常的错误报告比报错更难发现。
+            st.error(
+                "这局记录在引擎 {} 上，当前版本是 {}。为保证每个数字都对得上，不做跨版本重放。".format(
+                    run["engine_version"], ENGINE_VERSION)
+            )
+            return
+        _replay_run(
+            run["count"], run["turns"], run["seed"], run["actions"],
+            join_code=run["join_code"],
+        )
         st.rerun()
 
 
@@ -2463,7 +2711,13 @@ def _score_bar(runner: PlayerMatchRunner, played: int) -> None:
     my_run = runner.player_score
     their_run = runner.opponent_score
     margin = my_run - their_run
-    lead_word = "领先 %d 分" % abs(int(margin)) if margin else "持平"
+    # 领先 / 落后 by sign, not by magnitude: this used to print "领先 5 分" while
+    # the score bar itself showed 4 : 9, i.e. it told the player they were ahead
+    # exactly when they were behind.
+    lead_word = (
+        "领先 {} 分".format(abs(int(margin))) if margin > 0
+        else ("落后 {} 分".format(abs(int(margin))) if margin < 0 else "持平")
+    )
     lead_colour = (theme.MUTUAL if margin > 0
                    else (theme.DEFECT if margin < 0 else theme.MUTED))
     # The bar splits the points the two have actually taken, so the score reads
@@ -2492,17 +2746,23 @@ def _score_bar(runner: PlayerMatchRunner, played: int) -> None:
 
 def render_game_mode() -> None:
     """Game mode: play the generated opponents, then read the behaviour back."""
-    # 每次渲染都把进度镜像进地址栏。放在最前面，是因为下面每一处 return 都会
-    # 提前离开，写在这里才能覆盖所有分支（对战中、成绩页、行为分析页）。
+    # 每次渲染都把进度同时镜像进地址栏和名单库。放在最前面，是因为下面每一处
+    # return 都会提前离开，写在这里才能覆盖所有分支（对战中、成绩页、行为分析页）。
+    # 两条路径存的是同一串决策，只是给不同的人用：地址栏给刷新页面的这一次会话，
+    # 加入码给下周才回来的那一次。
     _persist_game()
+    _persist_store()
     # The motif belongs to this layer rather than the page: on the page it
     # ran under every control, and the border version of the sheet doubled
     # up where its strips overlapped.
     with st.container(key="tf_game_layer"):
         st.markdown("## 🎮 游戏模式")
+        # 恢复出来的一局读不到滑块（那是上一个会话的状态），所以以实际发到手
+        # 的对手数为准——否则一句"与 10 个策略对局"配着"第 2 / 4 局"。
+        setup = st.session_state.get(GAME_SETUP_KEY)
         st.caption(
             "与 {} 个随机生成的策略对局，逐步自己选择；结束后得到得分矩阵和行为分析。"
-            .format(st.session_state.get("game_opponents", 10))
+            .format(setup["count"] if setup else st.session_state.get("game_opponents", 10))
         )
         top_col, mid_col, end_col = st.columns(3)
         with top_col:
@@ -2510,7 +2770,8 @@ def render_game_mode() -> None:
                 for key in (GAME_SETUP_KEY, GAME_CODES_KEY, GAME_RUNNER_KEY,
                             GAME_MATCHES_KEY, GAME_DONE_KEY, GAME_RESULTS_KEY, GAME_PROFILE_KEY,
                             GAME_AI_KEY, GAME_CARD_KEY, GAME_TUTORIAL_KEY,
-                            GAME_TUTORIAL_DONE, TUTORIAL_RUNNER_KEY):
+                            GAME_TUTORIAL_DONE, TUTORIAL_RUNNER_KEY, GAME_JOIN_KEY,
+                            "game_phase"):
                     st.session_state.pop(key, None)
                 st.session_state["app_mode"] = None
                 _clear_persisted_game()
@@ -2519,9 +2780,13 @@ def render_game_mode() -> None:
             if st.session_state.get(GAME_MATCHES_KEY) and st.button(
                 "重新开始", key="game_restart", width="stretch"
             ):
+                # GAME_JOIN_KEY goes too: the next 开始这一局 allocates a fresh
+                # code, and keeping the old one would make this session write
+                # over a run another student might still be coming back for.
                 for key in (GAME_SETUP_KEY, GAME_CODES_KEY, GAME_RUNNER_KEY,
                             GAME_MATCHES_KEY, GAME_DONE_KEY, GAME_RESULTS_KEY, GAME_PROFILE_KEY,
-                            GAME_AI_KEY, GAME_CARD_KEY, GAME_TUTORIAL_DONE):
+                            GAME_AI_KEY, GAME_CARD_KEY, GAME_TUTORIAL_DONE, GAME_JOIN_KEY,
+                            "game_phase"):
                     st.session_state.pop(key, None)
                 _clear_persisted_game()
                 st.rerun()
@@ -2532,6 +2797,26 @@ def render_game_mode() -> None:
             }.get(phase, phase)))
 
         st.divider()
+
+        # One line, always present, that says how to come back. Without it the
+        # join code exists in the database and nowhere a student would look.
+        join_code = st.session_state.get(GAME_JOIN_KEY)
+        if join_code:
+            st.caption(
+                "你的加入码：**{}**　关掉页面、换设备，回到这里输入这串码就能接着打。"
+                "本站不记录姓名、邮箱或账号，这串码是你取回自己成绩的唯一凭据。".format(join_code)
+            )
+        if store_error := st.session_state.pop(STORE_ERROR_KEY, None):
+            st.warning(
+                "进度没能写进名单库（{}），对局本身不受影响；地址栏那条链接仍然能恢复这一局。".format(store_error)
+            )
+
+        # Shown whenever no run is active -- including before the tutorial, since
+        # a student returning from last week has already learned the rules and
+        # should not have to sit through it again to type in a code.
+        if not st.session_state.get(GAME_SETUP_KEY):
+            _render_resume_box()
+
         runner = st.session_state.get(GAME_RUNNER_KEY)
         if runner is not None:
             _render_game_play()
