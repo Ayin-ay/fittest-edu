@@ -14,6 +14,7 @@ import json
 import os
 import random
 import sys
+import zlib
 from pathlib import Path
 
 # Import pandas up front. Streamlit imports pandas lazily (e.g. inside
@@ -1923,11 +1924,36 @@ def _render_game_profile() -> None:
 
     _render_play_card(profile)
 
+    # Not 总局分 / 每局平均: the player read those on the 成绩 page one click
+    # ago. Not the opening or retaliation rates either -- the nine dimension cards
+    # directly below already state those as percentages. These three are raw
+    # counts of what physically happened across the run, which the conditional
+    # rates below cannot show.
+    turns_played = profile["total_turns"]
+    both_cooperated = sum(
+        1 for m in profile["matches"] for d in m.decisions
+        if d.action == "C" and d.opponent_action == "C")
+    # ``Decision.provoked`` is not this: it asks whether the opponent defected on
+    # the *previous* turn, which is the trigger for measuring retaliation, not a
+    # count of rounds where the player actually lost out.
+    cheated_on = sum(
+        1 for m in profile["matches"] for d in m.decisions
+        if d.action == "C" and d.opponent_action == "D")
     metric_a, metric_b, metric_c = st.columns(3)
-    metric_a.metric("总局分", "{:.0f}".format(profile["player_total"]))
-    metric_b.metric("每局平均", "{:.1f}".format(profile["player_average"]))
-    metric_c.metric("背叛步数", "{} / {}".format(
-        profile["total_defections"], profile["total_turns"]))
+    metric_a.metric("背叛步数", "{} / {}".format(
+        profile["total_defections"], turns_played))
+    metric_b.metric(
+        "互相合作", "{} / {}".format(both_cooperated, turns_played),
+        help="你和对手同时出合作的轮数。这是双方都拿 3 分的那些轮。",
+        delta="{:.0%}".format(both_cooperated / max(turns_played, 1)),
+        delta_color="off",
+    )
+    metric_c.metric(
+        "被单方面背叛", "{} 次".format(cheated_on),
+        help="你出合作、对手出背叛的轮数：你拿 0 分，它拿 5 分。"
+             "它与「互相合作」「互相背叛」加起来就是全部 {} 轮。".format(
+                 turns_played),
+    )
 
     # The score cards come first on purpose. A player should be able to read
     # where they stand before reading a single paragraph about why.
@@ -2047,9 +2073,8 @@ def _render_creation_ai(simulation, names: dict) -> None:
 def _render_play_card(profile: dict) -> None:
     """出牌风格卡：一个能直接发出去的结论。
 
-    这张卡**不依赖 AI**，也不依赖 Token 钱包——九项测量一算完就能出。理由是
-    分享这一环必须在免费路径上：愿意转发的人远多于愿意付费的人，卡片的传播
-    价值不该锁在付费墙后面。
+    这张卡**不依赖 AI**——九项测量一算完就能出。理由是分享这一环必须在免费
+    路径上：愿意转发的人远多于愿意付费的人，卡片的传播价值不该锁在付费墙后面。
 
     卡面只讲"你这十局怎么出牌"，不给人格类型，措辞避开特质形容词。这条界线
     和 ``profiling.py`` 原本的设计约束一致；卡片存在的意义是把测量归纳成一个
@@ -2086,44 +2111,21 @@ def _render_play_card(profile: dict) -> None:
             st.write(verdict["conclusion"])
         else:
             st.caption(
-                "连接 Token 钱包后可以让 AI 针对你的具体轮次写一段结论，"
-                "并挑出三条最说明问题的关键手。"
+                "下面的「用这段解读生成定制风格卡」会让模型只读你的具体轮次，"
+                "写一句结论并挑出三条最说明问题的关键手，写进同一张卡。"
+                "不点它，卡上就是纯本地测量的结果。"
             )
 
         st.download_button(
             "下载风格卡（PNG）",
             data=png,
-            file_name="the-fittest-style-{}.png".format(
-                abs(hash(style["name"])) % 10000),
+            file_name="fittest-style-{:08x}.png".format(
+                zlib.crc32(style["name"].encode("utf-8")) & 0xFFFFFFFF),
             mime="image/png",
             width="stretch",
         )
         with st.expander("复制文字版（发评论 / 群聊用）"):
             st.code(play_card_text(profile), language=None)
-
-
-def _in_wechat_browser() -> bool:
-    """是否在微信内置浏览器里。
-
-    Streamlit 给外链默认加 ``target="_blank"``，而微信会**拦截**向外部域的
-    ``_blank`` 跳转——点了完全没反应，这就是「连接钱包点不动」。``target="_self"``
-    在微信里可以跳，但同标签页跳走再回来可能丢掉 Streamlit 会话（PKCE 的
-    verifier 存在 session_state 里），所以微信下额外给一条「在浏览器中打开」
-    的退路。普通浏览器保持 ``_blank``，因为那样 App 页面不会被跳走。
-    """
-    try:
-        headers = st.context.headers
-    except Exception:  # noqa: BLE001 - 无运行上下文时按普通浏览器处理
-        return False
-    ua = ""
-    for key in ("User-Agent", "user-agent"):
-        try:
-            ua = headers.get(key) or ""
-        except Exception:  # noqa: BLE001
-            ua = ""
-        if ua:
-            break
-    return "micromessenger" in str(ua).lower()
 
 
 def _render_game_ai(profile: dict, results: dict) -> None:
@@ -2158,7 +2160,7 @@ def _render_game_ai(profile: dict, results: dict) -> None:
         if st.button("测试可用性", width="stretch"):
             try:
                 with st.spinner("测试中…"):
-                    reply = _probe()
+                    reply = ai_probe()
                 st.success("可用：{}".format(reply.strip()[:40]))
             except Exception as error:  # noqa: BLE001 - not the player's fault
                 st.error("暂时不可用：{}".format(error))
@@ -2190,7 +2192,7 @@ def _render_game_ai(profile: dict, results: dict) -> None:
                    "费用也更高。".format(profile["total_turns"]))
 
         # 定制风格卡：另一次独立调用，只问一个收得住的结论 + 三条关键手。
-        # 走同一个钱包、同一个归因头；主报告的禁令不受影响。
+        # 走同一份服务端密钥、同一个归因头；主报告的禁令不受影响。
         if st.button("用这段解读生成定制风格卡", width="stretch"):
             try:
                 with st.spinner("正在把结论写进卡片…"):
@@ -2229,20 +2231,6 @@ def _render_game_ai(profile: dict, results: dict) -> None:
             "下载这份解读", data=st.session_state[GAME_AI_KEY],
             file_name="game_analysis.md", mime="text/markdown",
         )
-
-
-def _probe_with_visitor_key(visitor_key: str) -> str:
-    """Test the visitor's own wallet, tolerating a stale deployed module.
-
-    Streamlit caches imported modules, so a deploy that picked up the new
-    ``app.py`` can briefly pair it with the previous ``ai_analysis`` that has no
-    ``key`` parameter. Probing by fallback rather than by keyword keeps the
-    button working during that window instead of showing a Python error.
-    """
-    try:
-        return ai_probe(key=visitor_key)
-    except TypeError:
-        return ai_probe()
 
 
 def _render_tutorial() -> None:
