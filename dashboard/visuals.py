@@ -90,6 +90,7 @@ def dimension_scores(profile: dict) -> list[dict]:
             "key": key,
             "label": label,
             "title": dimension.title if dimension else label,
+            "concept": dimension.concept if dimension else "",
             "value": round(value, 3),
             "percent": int(round(value * 100)),
             "direction": RADAR_DIRECTION.get(key, ""),

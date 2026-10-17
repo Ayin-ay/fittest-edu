@@ -15,7 +15,6 @@ import os
 import random
 import sqlite3
 import sys
-import zlib
 from pathlib import Path
 
 # Import pandas up front. Streamlit imports pandas lazily (e.g. inside
@@ -101,7 +100,6 @@ from dashboard.saveload import (  # noqa: E402
     save_simulation,
 )
 from dashboard.ai_analysis import (  # noqa: E402
-    card_verdict as ai_card_verdict,
     configured_provider_label as ai_provider_label,
     probe_connection as ai_probe,
     server_config as ai_config,
@@ -109,7 +107,9 @@ from dashboard.ai_analysis import (  # noqa: E402
     stream_analysis as ai_stream,
 )
 from dashboard import challenges  # noqa: E402
+from dashboard import demo_roster  # noqa: E402
 from dashboard import evolution_analysis  # noqa: E402
+from dashboard import game_theory  # noqa: E402
 from dashboard import store  # noqa: E402
 from dashboard import theme  # noqa: E402
 from dashboard.gameplay import (  # noqa: E402
@@ -128,11 +128,6 @@ from dashboard.gameplay import (  # noqa: E402
     strategy_tournament,
 )
 from dashboard.profiling import build_profile  # noqa: E402
-from dashboard.share_card import (  # noqa: E402
-    classify as classify_play_style,
-    build_card as build_play_card,
-    share_text as play_card_text,
-)
 from dashboard.tutorial import (  # noqa: E402
     CLOSING as TUTORIAL_CLOSING,
     INTRO as TUTORIAL_INTRO,
@@ -1351,16 +1346,20 @@ def _task_link(challenge_id: str) -> str:
     return "{}?{}".format(base, tail) if base else tail
 
 
-def _rank_table(board: dict) -> list[dict]:
+def _rank_table(board: dict, demo_codes: set[str] = frozenset()) -> list[dict]:
     """Submissions and reference lines in one score-ordered table.
 
     名次用的是并列名次（同分同名，下一名跳号）：全班用同一套策略时应该读成"并列"，
     而不是被任意地排出先后。
+
+    ``demo_codes`` 里的那些加入码后面直接跟一个「模拟」：榜会被单独截图，牌子只在整屏
+    顶部时，一张只有码和分的表就分不清是课堂还是演示。
     """
     scored = [
         (row["score"], "第 {} 名".format(
             sum(1 for other in board["rows"] if other["score"] > row["score"]) + 1),
-         row["join_code"], row["updated_at"])
+         "{}{}".format(row["join_code"], "（模拟）" if row["join_code"] in demo_codes else ""),
+         row["updated_at"])
         for row in board["rows"]
     ]
     for line in board["baselines"][:BOARD_BASELINES]:
@@ -1429,7 +1428,9 @@ def _render_challenge_board(runs: list[dict]) -> None:
             continue
         if not board["rows"]:
             st.caption("这个挑战下还没有一份打完的提交——上面那几行是参照线本身。")
-        st.dataframe(_rank_table(board), width="stretch", hide_index=True)
+        st.dataframe(_rank_table(
+            board, {run["join_code"] for run in group if run.get("demo")}),
+            width="stretch", hide_index=True)
         st.caption(
             "题面：{} 局 × 每局 {} 轮 = {} 步，种子 {}。全部提交都在同一套对手上重放算出。".format(
                 len(challenge["codes"]), challenge["turns"],
@@ -1530,6 +1531,77 @@ def _render_issue_desk() -> None:
                         label_visibility="collapsed")
 
 
+def _render_demo_notice(runs: list[dict]) -> None:
+    """当前视图里只要混着模拟提交，就把话说在榜之前。
+
+    牌子挂在筛选之后、评分之前：老师切到某个班、或截某一屏给别人看的时候，被截到的那批
+    行里有没有模拟数据，必须写在这一屏本身上，而不是等他回到上面另一块去读。
+    """
+    demo = sum(1 for run in runs if run.get("demo"))
+    if not demo:
+        return
+    real = len(runs) - demo
+    tail = "另外 {} 份是真实提交。".format(real) if real else "本视图内没有真实提交。"
+    st.warning(
+        "这一屏的 {} 份提交里有 {} 份是脚本生成的模拟数据，仅用于演示界面与流程，"
+        "不是真实课堂结果。{}".format(len(runs), demo, tail),
+        icon="⚠️",
+    )
+
+
+def _render_demo_desk() -> None:
+    """演示用模拟名单：一个按钮把「老师看全班」这一屏讲清楚，并在每一处标明它是模拟的。
+
+    为什么放在教师门后：这批行的结构和真实提交完全一样，只有 ``demo`` 标记区分；能一键
+    写进名单的人，也就得能在同一屏看到「这不是课堂」。写与清都只作用于带标记的行。
+
+    为什么值得有：没有一批人，榜、参照线、进行中/已打完这些读数都是空的，讲不出教学故事；
+    而现场手点二十遍既慢又不可复现。这里的每一行都是真跑出来的——同一套引擎、同一串
+    对手、同一份种子——所以点进任一模拟加入码，学生端那份报告照常成立。
+    """
+    st.markdown("**演示数据（模拟名单）**")
+    st.caption(
+        "这两个按钮写入的是脚本生成的提交，用来在没有真实班级时演示这一屏。每一行都带"
+        "模拟标记，看板会挂「模拟数据，非真实课堂」的牌子，导出的 CSV 里对应 ``demo=1``。"
+        "它们不是真实试点，也不得在任何材料里被写成真实使用效果。")
+    echo = st.session_state.pop("demo_echo", "")
+    loaded = 0
+    try:
+        loaded = demo_roster.count()
+    except (sqlite3.Error, OSError) as error:
+        st.warning("名单库暂时读不出来：{}".format(error))
+        return
+    if loaded:
+        st.caption("库里现有 {} 份模拟提交。".format(loaded))
+    load_col, clear_col = st.columns(2)
+    with load_col:
+        if st.button("载入模拟名单（演示）", width="stretch",
+                     help="约 55 份、两个班、四份预置挑战，由固定种子在真引擎上跑出来；"
+                          "同一个种子两次载入得到同一批决策。"):
+            try:
+                written = demo_roster.load()
+            except (sqlite3.Error, OSError, RuntimeError) as error:
+                st.error("写入失败：{}".format(error))
+            else:
+                # 重写这一屏而不是就地提示：库里刚多了几十份提交，榜、进行中/已打完、
+                # 清除按钮的可用状态都得按新数量再算一遍。
+                st.session_state["demo_echo"] = "已载入 {} 份模拟提交。".format(written)
+                st.rerun()
+    with clear_col:
+        if st.button("清除模拟名单", width="stretch", disabled=not loaded,
+                     help="只删带模拟标记的行；学生真实提交一份都不动。"):
+            try:
+                removed = demo_roster.clear()
+            except (sqlite3.Error, OSError) as error:
+                st.error("清除失败：{}".format(error))
+            else:
+                st.session_state["demo_echo"] = "已清除 {} 份模拟提交，真实提交未受影响。".format(
+                    removed)
+                st.rerun()
+    if echo:
+        st.success(echo)
+
+
 def _render_roster_panel() -> None:
     """名单导出 / 导入——免费版文件系统是临时的，这条路径是唯一的兜底。
 
@@ -1574,6 +1646,7 @@ def _render_roster_panel() -> None:
             unsafe_allow_html=True,
         )
         _render_issue_desk()
+        _render_demo_desk()
 
         try:
             runs = store.list_runs()
@@ -1582,7 +1655,8 @@ def _render_roster_panel() -> None:
             return
 
         if not runs:
-            st.caption("名单库还是空的。学生开始一局后这里就会有记录。")
+            st.caption("名单库还是空的。学生开始一局后这里就会有记录；"
+                       "想先看看这一屏长什么样，用上面那个「载入模拟名单（演示）」。")
         else:
             classes = sorted({run["class_code"] for run in runs if run["class_code"]})
             picked = st.selectbox(
@@ -1592,6 +1666,7 @@ def _render_roster_panel() -> None:
                 run for run in runs
                 if picked == "全部班级" or run["class_code"] == picked
             ]
+            _render_demo_notice(shown)
             _render_board_summary(shown)
             _render_challenge_board(shown)
             with st.expander("逐份提交（加入码原样列出）", expanded=False):
@@ -1603,6 +1678,7 @@ def _render_roster_panel() -> None:
                         {
                             "加入码": run["join_code"],
                             "班级码": run["class_code"] or "—",
+                            "来源": "模拟" if run.get("demo") else "真实",
                             "挑战码": run["challenge_id"] or "—",
                             "状态": "已完成" if run["status"] == "finished" else "进行中",
                             "局数": run["count"],
@@ -1786,8 +1862,6 @@ GAME_DONE_KEY = "game_done"
 GAME_RESULTS_KEY = "game_results"
 GAME_PROFILE_KEY = "game_profile"
 GAME_AI_KEY = "game_ai_report"
-#: AI 写的那张卡的结论与关键手。没有它时风格卡走本地计算的版本。
-GAME_CARD_KEY = "game_card_verdict"
 GAME_AI_OVERVIEW_KEY = "game_ai_overview"
 GAME_TUTORIAL_KEY = "game_tutorial"
 GAME_TUTORIAL_DONE = "game_tutorial_done"
@@ -1888,7 +1962,8 @@ GAME_HELP = {
          "一个策略可以打赢全场却在你这儿拿低分——那说明它克制的是别人，"
          "不是你的打法有问题。反过来也一样。"),
         ("背叛倾向",
-         "它在全部对局里出背叛的比例，与它对你做了什么无关，是它整体的风格。"),
+         "它在全部对局里出背叛的比例，与它对你做了什么无关，只看这条策略规则"
+         "本身有多容易出手。"),
         ("学习目标",
          "同一策略在不同情境里的价值可以相反。判断一个打法好不好，先问它"
          "面对的是谁——这正是下面「逐局记录」和「行为分析」要分开看的原因。"),
@@ -1907,13 +1982,28 @@ GAME_HELP = {
          "从十行的形状里读出自己的转折点：哪一轮你开始还手、哪一轮开始收手，"
          "比记住任何一局的胜负更重要。"),
     ],
+    "theory": [
+        ("这一段是什么",
+         "六条课本结论，逐条拿你这一局的记录去对：占优策略、合作剩余、条件合作、"
+         "贴现因子与惩罚、逆向归纳、可预测性。每条的读数都由你的具体轮次算出，"
+         "条文、证据与可推翻条件都收在点开的那一行里。"),
+        ("为什么值得点开",
+         "博弈论的预测是条件式的——「如果对手在乎未来到某个程度，那么……」。"
+         "读的时候先看清它假设了什么，再看你这一局落在假设的哪一边。"),
+        ("边界",
+         "这里不下均衡判断，也不测你的推理层级；对面那些对手是固定规则，"
+         "它们不会学习，所以凡涉及「被利用」的读数都只是你这套出牌序列的性质。"),
+        ("学习目标",
+         "把一条定理当成可以验证的陈述：它给了什么阈值，你的数字在阈值的哪一侧，"
+         "以及要看到什么才算把它推翻。"),
+    ],
     "profile": [
         ("这些数字是什么",
-         "全部来自对你这 100 步决策的确定性计算：本地算的，不经过大模型。"
+         "全部来自对你这一局每一步决策的确定性计算：本地算的，不经过大模型。"
          "每一项都附具体场次轮次的证据，并写明什么观察能推翻它。"),
         ("这些数字不是什么",
-         "不是心理诊断，也不给人格类型。「出牌风格」只是这些测量的归纳说法，"
-         "描述你在这几局里怎么出牌，换个种子就可能换个说法。"),
+         "不是心理诊断，也不给人格类型。这里每一项测的都是「你在这几局里怎么出的牌」，"
+         "不是「你是什么样的人」，换个对手、换个种子就会换个数。"),
         ("想看得更准怎么办",
          "单次 100 步够看出倾向，不够看出稳定。要比稳定性，就换种子多打几局，"
          "或者把轮数调长。"),
@@ -1955,21 +2045,35 @@ GAME_HELP = {
     "prediction": [
         ("这一屏在说什么",
          "开了「每轮先猜对手出什么」之后，每一轮你先选一次「它这轮出合作还是背叛」，"
-         "再决定你自己出什么。这里只算猜中的比例，与你得几分、你出的是哪一手都无关。"),
+         "再决定你自己出什么。这里把你写下的预期和对手实际出的那一手逐轮对齐，"
+         "算三个本地数字：猜中的比例、不猜的参照线、信念与出手是否一致。"),
+        ("为什么要有一条参照线",
+         "一个 60% 的命中率什么都说明不了：对手本来就常出某一手的牌，每轮都猜那一手"
+         "就能白拿 60%。参照线算的正是这个「什么都不推断」能拿到的数。高过它，"
+         "说明你的预期真的从对局里带来了信息；低过它，说明你系统性地猜反了——"
+         "后者在教学上比前者更有意思。"),
         ("为什么要单独量这一项",
          "打得好和看得准是两件事。有人一路背叛也能拿高分，因为对手恰好不还手；"
-         "有人把对手猜得很准，却仍然选择背叛。把猜测单独记下来，才知道自己缺的是判断"
+         "有人把对手猜得很准，却仍然选择背叛。把预期单独记下来，才知道缺的是判断"
          "还是决断。"),
+        ("「信念与出手一致」是什么",
+         "你猜它合作的那些轮，自己是不是也出了合作；猜它背叛的轮同理。它只看你说的和"
+         "做的是不是同一件事，与猜得准不准无关。一个准而不自洽的人，和一个不自洽"
+         "但没猜的人，在这里会读成两种不同的东西。"),
         ("猜不准说明什么",
          "只说明一件事：那个对手的行为里有你还没识别出来的规则，或者它本身带噪声"
          "（带神经质、心狠、失忆这类修正槽的策略，行为里真的有随机数）。两者都不说明"
          "别的什么，也不是能力评价。"),
+        ("这一屏不测什么",
+         "不测你能推理到第几层，也不测你会不会求均衡。这些是模型、是别人替你做的评价，"
+         "本地这几个数算不出来，也不该被说成算出来了。它只登记了两件可对上的事：你预期"
+         "它出什么，它实际出了什么。"),
         ("和九项维度的关系",
-         "九项维度量的是你做了什么；这一屏量的是你以为对手会做什么。一个是行为测量，"
-         "一个是心智模型的准确度，刻意不合并。"),
+         "九项维度量的是你做了什么；这一屏量的是你预期对手做什么，以及那份预期有没有"
+         "对上你自己出的那一手。一个是行为，一个是预期的准度与自洽度，刻意不合并。"),
         ("学习目标",
          "把你对对手的判断写成可以被推翻的预测——每一轮它就是一次检验。猜错的那些轮，"
-         "去「已完成的局」里回看它当时按哪条规则出牌，比记住自己的错误更有用。"),
+         "去「已完成的局」里回看它当时按哪条规则出牌，比记住自己的分数更有用。"),
     ],
     "record": [
         ("「另一手」那一列在说什么",
@@ -3001,6 +3105,14 @@ def _render_class_rank() -> None:
             "（地址栏恢复的局一定会带着加入码）。成绩与行为分析不受影响。")
         return
 
+    # 演示用模拟名单和真实提交走的是同一张表，所以它们会一起进榜。这句话必须写在名次
+    # 旁边：不然一个学生看到的"你在 40 人里第 12"里，有 35 个是脚本。
+    demo = sum(1 for run in peers if run.get("demo"))
+    if demo:
+        st.caption(
+            "这批提交里有 {} 份是教师端载入的演示数据，名次把它们一起算了进去。"
+            "所以这一屏的相对位置用来看界面怎么走，不能读成真实班级的排名。".format(demo))
+
     st.markdown(
         theme.heading("这批提交里的位置", 3, help_blocks=GAME_HELP["rank"]),
         unsafe_allow_html=True,
@@ -3098,35 +3210,58 @@ def _prediction_stats(matches: list) -> dict | None:
 
     只数真的猜过的那些轮：没猜的那些轮记成 ``-``，它们既不算猜对也不算猜错，否则
     「跳过」会被读成「猜错」。这是本地逐轮比对，不是模型给出的判断。
+
+    每局那条「参照线」也是本地算的：它等于「这一局干脆每轮都猜对手出得更多的那一手」
+    能中的比例。没有它，一个 60% 的命中率什么都说明不了——对手本来就更常出某一手的
+    时候，一直猜那一手就能白拿这个数。
+
+    「信念—行动一致性」是第三件事：你猜它合作的那些轮，你自己是不是也出了合作。它衡量
+    你说的是什么、做的是不是同一件事，与猜得准不准无关。
     """
     rows = []
     guesses = 0
     hits = 0
+    # 参照线的分子合计：每局「只猜对手出得更多的那一手」能中的轮数。
+    blank_hits = 0
+    # 信念—行动一致性：你猜它合作，你自己这一轮是不是也出合作。
+    aligned = 0
     for match in matches:
         played = [
-            (decision.prediction, decision.opponent_action)
+            (decision.prediction, decision.opponent_action, decision.action)
             for decision in match.decisions
             if decision.prediction in ("C", "D")
         ]
         if not played:
             continue
-        hit = sum(1 for guess, actual in played if guess == actual)
+        hit = sum(1 for guess, actual, _ in played if guess == actual)
+        aligned += sum(1 for guess, _, mine in played if guess == mine)
         guesses += len(played)
         hits += hit
+        # 对手在这一局的实际背叛率：拿它当参照，等于问「每轮都猜同一手能中多少」。
+        opponent_defects = sum(1 for _, actual, _ in played if actual == "D")
+        blank_row = max(len(played) - opponent_defects, opponent_defects)
+        blank_hits += blank_row
         rows.append({
             "局次": match.index + 1,
             "对手": match.opponent_label,
             "猜了": len(played),
             "猜中": hit,
             "命中率": "{:.0%}".format(hit / len(played)),
+            "参照线": "{:.0%}".format(blank_row / len(played)),
         })
     if not rows:
         return None
-    return {"rows": rows, "guesses": guesses, "hits": hits}
+    return {
+        "rows": rows,
+        "guesses": guesses,
+        "hits": hits,
+        "blank_hits": blank_hits,
+        "aligned": aligned,
+    }
 
 
 def _render_prediction_card(profile: dict) -> None:
-    """那一屏只有一件事：你猜对手的行为，猜得准不准。"""
+    """那一屏只有一件事：你对对手的预期，与它实际做了什么差多少。"""
     stats = _prediction_stats(profile["matches"])
     if stats is None:
         return
@@ -3139,24 +3274,51 @@ def _render_prediction_card(profile: dict) -> None:
         ),
         unsafe_allow_html=True,
     )
-    rate_col, count_col, best_col = st.columns(3)
+    rate_col, base_col, align_col = st.columns(3)
     rate_col.metric(
         "预测命中率", "{:.0%}".format(stats["hits"] / max(stats["guesses"], 1)),
         help="猜中的轮数 ÷ 猜过的轮数。只算真的猜过的那些轮；跳过的轮不进分母。",
     )
-    count_col.metric(
-        "猜了 / 全部", "{} / {} 轮".format(
-            stats["guesses"], profile["total_turns"]),
-        help="剩下那些轮你直接出了牌，没有先猜。",
+    base_col.metric(
+        "不猜的参照线", "{:.0%}".format(stats["blank_hits"] / max(stats["guesses"], 1)),
+        help=(
+            "每轮都猜对手在这一局出得更多的那一手，能中的比例。"
+            "命中率高过它，才说明你的预期带进了对局里的信息；低于它，就是猜反了。"
+        ),
     )
-    top = max(stats["rows"], key=lambda row: row["猜中"] / row["猜了"])
-    best_col.metric(
-        "猜得最准的一局", "第 {} 局".format(top["局次"]),
-        delta="{} {}".format(top["命中率"], top["对手"]),
-        delta_color="off",
-        help="对手标签是这一局那个策略的行为类别——猜得准往往意味着它的行为有规则可循。",
+    align_col.metric(
+        "信念与出手一致", "{:.0%}".format(stats["aligned"] / max(stats["guesses"], 1)),
+        help=(
+            "你猜它合作的那些轮里，自己是否也出了合作；猜它背叛的轮同理。"
+            "这一条只看嘴和手是不是同一件事，与猜得准不准无关。"
+        ),
+    )
+    st.caption(
+        "这些轮里你猜了 {} 次，其余 {} 轮是直接出的牌；下面每一行的参照线按该局单独算。".format(
+            stats["guesses"], max(profile["total_turns"] - stats["guesses"], 0)
+        )
     )
     st.dataframe(stats["rows"], width="stretch", hide_index=True)
+
+
+def _render_theory_readings(profile: dict) -> None:
+    """六条博弈论读数，一条一行；条文与证据收在行内。
+
+    放在三个原始计数之上：这一版的行为分析要先把「这盘棋的结构说了什么」讲完，
+    再去看你自己留下了多少步。读数全部由 :mod:`dashboard.game_theory` 从已存的逐轮
+    决策本地算出，不经过大模型。
+    """
+    st.markdown(
+        theme.heading("这盘棋的博弈论读数", 3, help_blocks=GAME_HELP["theory"]),
+        unsafe_allow_html=True,
+    )
+    items = [
+        {"concept": reading.concept, "value": reading.value, "rule": reading.rule,
+         "verdict": reading.verdict, "evidence": reading.evidence,
+         "falsifier": reading.falsifier}
+        for reading in game_theory.readings(profile["matches"])
+    ]
+    st.markdown(theme.theory_readings(items), unsafe_allow_html=True)
 
 
 def _render_game_profile() -> None:
@@ -3175,7 +3337,7 @@ def _render_game_profile() -> None:
         )
     )
 
-    _render_play_card(profile)
+    _render_theory_readings(profile)
 
     # Not 总局分 / 每局平均: the player read those on the 成绩 page one click
     # ago. Not the opening or retaliation rates either -- the nine dimension cards
@@ -3222,8 +3384,8 @@ def _render_game_profile() -> None:
         with cards[index % 3]:
             st.metric(
                 row["label"], "{}%".format(row["percent"]),
-                help="{}\n方向：{}\n实际测量：{}".format(
-                    row["title"], row["direction"], row["measured"]),
+                help="课本概念：{}\n{}\n方向：{}\n实际测量：{}".format(
+                    row["concept"], row["title"], row["direction"], row["measured"]),
             )
 
     # Measured: these six figures are ~44.5 KB of JSON, 84% of everything the
@@ -3256,7 +3418,8 @@ def _render_game_profile() -> None:
             "并写明什么观察能推翻它。刻意不给人格类型或「像某个策略」的结论。".format(
                 profile["total_turns"]))
         for dimension in profile["dimensions"]:
-            with st.expander(dimension.title, expanded=False):
+            with st.expander("{}｜{}".format(dimension.concept, dimension.title),
+                             expanded=False):
                 st.markdown(dimension.to_markdown())
 
     st.divider()
@@ -3324,64 +3487,6 @@ def _render_creation_ai(simulation, names: dict) -> None:
             st.error("生成失败：{}".format(error))
 
 
-def _render_play_card(profile: dict) -> None:
-    """出牌风格卡：一个能直接发出去的结论。
-
-    这张卡**不依赖 AI**——九项测量一算完就能出。理由是分享这一环必须在免费
-    路径上：愿意转发的人远多于愿意付费的人，卡片的传播价值不该锁在付费墙后面。
-
-    卡面只讲"你这十局怎么出牌"，不给人格类型，措辞避开特质形容词。这条界线
-    和 ``profiling.py`` 原本的设计约束一致；卡片存在的意义是把测量归纳成一个
-    能读、能转发的结论，而不是给读者贴标签。
-
-    AI 版会在同一个位置叠加模型写的结论与关键手——见 ``_render_game_ai``。
-    """
-    style = classify_play_style(profile)
-    verdict = st.session_state.get(GAME_CARD_KEY) or {}
-
-    try:
-        png = build_play_card(
-            profile,
-            conclusion=verdict.get("conclusion"),
-            evidence=verdict.get("evidence"),
-        )
-    except Exception as error:  # noqa: BLE001 - 出图失败不该让整页崩掉
-        st.warning("风格卡暂时画不出来：{}".format(error))
-        return
-
-    left, right = st.columns([1, 1], gap="large")
-    with left:
-        st.image(png, width="stretch")
-    with right:
-        st.markdown("#### 你的出牌风格")
-        st.markdown("**{}**　匹配度 {}%".format(
-            style["name"], int(round(style["match"] * 100))))
-        st.caption(
-            "风格名 = 原型 + 你偏离最远的那一项。全站共有 10 个原型 × 9 种修饰，"
-            "同样的对局一定得到同一个风格。"
-        )
-        if verdict.get("conclusion"):
-            st.markdown("**AI 版结论**")
-            st.write(verdict["conclusion"])
-        else:
-            st.caption(
-                "下面的「用这段解读生成定制风格卡」会让模型只读你的具体轮次，"
-                "写一句结论并挑出三条最说明问题的关键手，写进同一张卡。"
-                "不点它，卡上就是纯本地测量的结果。"
-            )
-
-        st.download_button(
-            "下载风格卡（PNG）",
-            data=png,
-            file_name="fittest-style-{:08x}.png".format(
-                zlib.crc32(style["name"].encode("utf-8")) & 0xFFFFFFFF),
-            mime="image/png",
-            width="stretch",
-        )
-        with st.expander("复制文字版（发评论 / 群聊用）"):
-            st.code(play_card_text(profile), language=None)
-
-
 def _render_game_ai(profile: dict, results: dict) -> None:
     """In-app LLM reading of the session.
 
@@ -3390,8 +3495,10 @@ def _render_game_ai(profile: dict, results: dict) -> None:
     """
     st.markdown("### 大模型深度解读")
     st.caption(
-        "会把全部 {} 步决策连同反事实数据一起交给大模型，"
-        "要求它逐局逐步剖析你的动机，并落到现实场景。".format(
+        "会把全部 {} 步的逐轮记录（每一轮的双方出手、这一手拿到几分、另一手能拿"
+        "几分、两条分支下对手下一轮怎么走）连同总分交给大模型，要求它把这些出手"
+        "讲回课本上的那几条条件句，并指出哪条被这次的数据支持、哪条被推翻。"
+        "它不评价人：不给性格标签，也不推断动机。".format(
             profile["total_turns"]
         )
     )
@@ -3441,28 +3548,13 @@ def _render_game_ai(profile: dict, results: dict) -> None:
     # rerun that still had a stored summary raised UnboundLocalError.
     overview_text = st.session_state.get(GAME_AI_OVERVIEW_KEY)
     if overview_text:
-        st.markdown("### 结论速览\n\n" + overview_text)
+        st.markdown("### 课本结论速览\n\n" + overview_text)
         st.caption("速览到此为止。完整版要读全部 {} 步决策，耗时明显更长，"
                    "费用也更高。".format(profile["total_turns"]))
 
-        # 定制风格卡：另一次独立调用，只问一个收得住的结论 + 三条关键手。
-        # 走同一份服务端密钥、同一个归因头；主报告的禁令不受影响。
-        if st.button("用这段解读生成定制风格卡", width="stretch"):
+        if st.button("展开完整版解读", width="stretch"):
             try:
-                with st.spinner("正在把结论写进卡片…"):
-                    verdict = ai_card_verdict(
-                        profile, results,
-                    )
-                if not verdict:
-                    raise RuntimeError("模型没有返回可用的卡片结论。")
-                st.session_state[GAME_CARD_KEY] = verdict
-                st.rerun()
-            except Exception as error:  # noqa: BLE001 - surface to the player
-                st.error("生成卡片结论失败：{}".format(error))
-
-        if st.button("展开完整版剖析", width="stretch"):
-            try:
-                st.caption("正在逐步剖析，可能要等一两分钟…")
+                st.caption("正在逐轮数这些出手，可能要等一两分钟…")
                 detail = st.write_stream(
                     ai_stream(profile, results, plan="full",
                               ),
@@ -3479,7 +3571,7 @@ def _render_game_ai(profile: dict, results: dict) -> None:
                 st.error("调用失败：{}".format(error))
 
     if st.session_state.get(GAME_AI_KEY):
-        st.markdown("### 完整剖析")
+        st.markdown("### 完整解读")
         st.markdown(st.session_state[GAME_AI_KEY])
         st.download_button(
             "下载这份解读", data=st.session_state[GAME_AI_KEY],
@@ -3787,7 +3879,7 @@ def render_game_mode() -> None:
             if st.button("← 返回模式选择", key="game_back", width="stretch"):
                 for key in (GAME_SETUP_KEY, GAME_CODES_KEY, GAME_RUNNER_KEY,
                             GAME_MATCHES_KEY, GAME_DONE_KEY, GAME_RESULTS_KEY, GAME_PROFILE_KEY,
-                            GAME_AI_KEY, GAME_CARD_KEY, GAME_TUTORIAL_KEY,
+                            GAME_AI_KEY, GAME_TUTORIAL_KEY,
                             GAME_TUTORIAL_DONE, TUTORIAL_RUNNER_KEY, GAME_JOIN_KEY,
                             "game_phase"):
                     st.session_state.pop(key, None)
@@ -3803,7 +3895,7 @@ def render_game_mode() -> None:
                 # over a run another student might still be coming back for.
                 for key in (GAME_SETUP_KEY, GAME_CODES_KEY, GAME_RUNNER_KEY,
                             GAME_MATCHES_KEY, GAME_DONE_KEY, GAME_RESULTS_KEY, GAME_PROFILE_KEY,
-                            GAME_AI_KEY, GAME_CARD_KEY, GAME_TUTORIAL_DONE, GAME_JOIN_KEY,
+                            GAME_AI_KEY, GAME_TUTORIAL_DONE, GAME_JOIN_KEY,
                             "game_phase"):
                     st.session_state.pop(key, None)
                 _clear_persisted_game()

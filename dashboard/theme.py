@@ -1044,6 +1044,61 @@ a { color: #2E7DE4; }
 .tf-pred__mark { font-weight: 700; color: %(ink)s; }
 .tf-pred__score { margin-left: auto; font-variant-numeric: tabular-nums; }
 
+/* Game-theory readings. The collapsed line is the only thing a student has to
+   read to know where they stand on that concept, so the textbook statement, the
+   evidence turns and the falsifier all wait inside. Nothing here is coloured by
+   good/bad: colour on this page still means cooperation or defection only. */
+.tf-reads {
+  display: grid;
+  gap: .4rem;
+  margin: .35rem 0 1.1rem;
+}
+.tf-read {
+  border: 1px solid %(line)s;
+  border-radius: 11px;
+  background: %(raised)s;
+}
+.tf-read > summary {
+  display: flex;
+  align-items: baseline;
+  gap: .7rem;
+  flex-wrap: wrap;
+  padding: .6rem .85rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: .88rem;
+  color: %(muted)s;
+}
+.tf-read > summary::-webkit-details-marker { display: none; }
+.tf-read[open] > summary { border-bottom: 1px solid %(line)s; }
+.tf-read__concept {
+  flex: none;
+  font-weight: 700;
+  color: %(ink)s;
+  font-size: .9rem;
+}
+.tf-read__value { flex: 1 1 18rem; font-variant-numeric: tabular-nums; }
+.tf-read__body { padding: .8rem .9rem .95rem; }
+.tf-read__body p.tf-read-k {
+  margin: .7rem 0 .1rem;
+  font-size: .74rem;
+  letter-spacing: .08em;
+  color: %(faint)s;
+}
+.tf-read__body p.tf-read-k:first-child { margin-top: 0; }
+.tf-read__body p.tf-read-t {
+  margin: 0;
+  font-size: .88rem;
+  line-height: 1.7;
+  color: %(ink)s;
+}
+.tf-read__body ul { margin: .1rem 0 0; padding-left: 1.1rem; }
+.tf-read__body li {
+  font-size: .84rem;
+  line-height: 1.65;
+  color: %(muted)s;
+}
+
 /* Running score. A player wants this after every turn, and it used to live
    only inside the history table further down the page. */
 .tf-score {
@@ -1320,6 +1375,9 @@ details.tf-help[open] > summary { background: #2E7DE4; color: #FBF7F0; }
   .tf-fold .tf-fold-hint { display: none; }
   .tf-fold > summary { padding: .7rem .85rem; }
   .tf-fold-body { padding: .9rem .95rem 1rem; }
+  /* The concept name owns its own line on a phone; the number would otherwise
+     wrap to one word per line beside it. */
+  .tf-read__concept { flex: none; width: 100%%; }
   h2 { font-size: 1.3rem !important; }
   p, li { font-size: .95rem; }
 }
@@ -1641,4 +1699,38 @@ def prose_card(paragraphs: list[str]) -> str:
     paragraph reads as filler next to the cards around it."""
     body = "".join('<p class="tf-lede">{}</p>'.format(p) for p in paragraphs)
     return '<div class="tf-card">{}</div>'.format(body)
+
+
+def theory_readings(items: list[dict]) -> str:
+    """Game-theory readings, one collapsed line each.
+
+    ``items`` carry ``concept`` / ``value`` / ``rule`` / ``verdict`` /
+    ``evidence`` / ``falsifier``. The concept and its number stay visible so the
+    page reads as a list of measurements; the textbook statement, the turns it
+    rests on and the refuting observation open on click.
+    """
+    rows = []
+    for item in items:
+        evidence = "".join("<li>{}</li>".format(line) for line in item["evidence"])
+        parts = [
+            '<p class="tf-read-k">课本条文</p><p class="tf-read-t">{}</p>'.format(
+                item["rule"]),
+            '<p class="tf-read-k">这一局怎么读</p><p class="tf-read-t">{}</p>'.format(
+                item["verdict"]),
+        ]
+        if evidence:
+            parts.append('<p class="tf-read-k">证据</p><ul>{}</ul>'.format(evidence))
+        if item["falsifier"]:
+            parts.append('<p class="tf-read-k">何种观察可推翻</p>'
+                         '<p class="tf-read-t">{}</p>'.format(item["falsifier"]))
+        rows.append(
+            '<details class="tf-read">'
+            '<summary><span class="tf-read__concept">{concept}</span>'
+            '<span class="tf-read__value">{value}</span></summary>'
+            '<div class="tf-read__body">{body}</div>'
+            "</details>".format(
+                concept=item["concept"], value=item["value"],
+                body="".join(parts))
+        )
+    return '<div class="tf-reads">{}</div>'.format("".join(rows))
 

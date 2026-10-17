@@ -25,6 +25,13 @@ the teacher invents, not a roster of students. The challenge code says which
 fixed opponent set a run was played against -- it is the key the class ranking
 groups by, and it carries nothing about who played.
 
+One column is not a player field at all: ``demo`` marks rows written by
+:mod:`dashboard.demo_roster` for the teacher-panel walkthrough. They are
+structurally identical to real submissions -- same fields, same engine, same
+replay -- and only that flag separates them, which is exactly why the flag has to
+exist: a board that cannot tell a scripted class from a real one is a board that
+will be photographed and quoted as evidence of a pilot.
+
 Deployment: Streamlit Cloud's free tier has an ephemeral filesystem, so this
 database is reset on a redeploy. :func:`export_csv` and :func:`import_csv` exist
 for exactly that reason -- the teacher downloads the whole table at the end of
@@ -51,7 +58,7 @@ CODE_LENGTH = 8
 COLUMNS = [
     "join_code", "class_code", "challenge_id", "status", "engine_version",
     "opponent_count", "turns", "seed", "actions", "predictions",
-    "tutorial_done", "created_at", "updated_at",
+    "tutorial_done", "demo", "created_at", "updated_at",
 ]
 
 CHALLENGE_COLUMNS = [
@@ -59,7 +66,7 @@ CHALLENGE_COLUMNS = [
     "note", "created_at",
 ]
 
-SCHEMA = """
+SCHEMA_TABLES = """
 CREATE TABLE IF NOT EXISTS runs (
     join_code      TEXT PRIMARY KEY,
     class_code     TEXT NOT NULL DEFAULT '',
@@ -73,10 +80,9 @@ CREATE TABLE IF NOT EXISTS runs (
     predictions    TEXT NOT NULL DEFAULT '',
     tutorial_done  INTEGER NOT NULL DEFAULT 0,
     status         TEXT NOT NULL DEFAULT 'playing',
-    challenge_id   TEXT NOT NULL DEFAULT ''
+    challenge_id   TEXT NOT NULL DEFAULT '',
+    demo           INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS runs_class ON runs (class_code);
-CREATE INDEX IF NOT EXISTS runs_challenge ON runs (challenge_id);
 CREATE TABLE IF NOT EXISTS challenges (
     challenge_id TEXT PRIMARY KEY,
     title        TEXT NOT NULL,
@@ -87,6 +93,15 @@ CREATE TABLE IF NOT EXISTS challenges (
     note         TEXT NOT NULL DEFAULT '',
     created_at   TEXT NOT NULL
 );
+"""
+
+#: Split out of the table statements on purpose. An index cannot be built on a
+#: column an older database does not have yet, and the migrations that add those
+#: columns have to run in between -- otherwise a roster written before the
+#: challenge feature refuses to open at all.
+SCHEMA_INDEXES = """
+CREATE INDEX IF NOT EXISTS runs_class ON runs (class_code);
+CREATE INDEX IF NOT EXISTS runs_challenge ON runs (challenge_id);
 CREATE INDEX IF NOT EXISTS challenges_class ON challenges (class_code);
 """
 
@@ -96,6 +111,7 @@ CREATE INDEX IF NOT EXISTS challenges_class ON challenges (class_code);
 _MIGRATIONS = (
     ("runs", "challenge_id", "TEXT NOT NULL DEFAULT ''"),
     ("runs", "predictions", "TEXT NOT NULL DEFAULT ''"),
+    ("runs", "demo", "INTEGER NOT NULL DEFAULT 0"),
 )
 
 
@@ -104,12 +120,17 @@ def _now() -> str:
 
 
 def connect() -> sqlite3.Connection:
-    """Open the store, creating ``archive/`` and the schema on first use."""
+    """Open the store, creating ``archive/`` and the schema on first use.
+
+    Tables, then the columns an older file is missing, then the indexes: an index
+    on ``challenge_id`` is exactly what fails when it is built too early.
+    """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH, timeout=10)
     connection.row_factory = sqlite3.Row
-    connection.executescript(SCHEMA)
+    connection.executescript(SCHEMA_TABLES)
     _migrate(connection)
+    connection.executescript(SCHEMA_INDEXES)
     return connection
 
 
@@ -152,17 +173,24 @@ def new_join_code() -> str:
 def create_run(
     join_code: str, *, class_code: str, opponent_count: int, turns: int,
     seed: int, engine_version: str, tutorial_done: bool = False,
-    challenge_id: str = "",
+    challenge_id: str = "", demo: bool = False,
 ) -> None:
-    """Register a run so it can be reloaded before any decision exists."""
+    """Register a run so it can be reloaded before any decision exists.
+
+    ``demo`` is written by :mod:`dashboard.demo_roster` only; every real player's
+    run leaves it at 0, and it is the one thing that keeps a scripted class from
+    being read as a taught one.
+    """
     with connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO runs (join_code, class_code, challenge_id,"
             " created_at, updated_at, engine_version, opponent_count, turns,"
-            " seed, actions, tutorial_done, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, 'playing')",
+            " seed, actions, tutorial_done, status, demo)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, 'playing', ?)",
             (join_code, class_code.strip(), normalize_code(challenge_id),
              _now(), _now(), engine_version,
-             opponent_count, turns, seed, int(bool(tutorial_done))),
+             opponent_count, turns, seed, int(bool(tutorial_done)),
+             int(bool(demo))),
         )
 
 
@@ -216,6 +244,7 @@ def _as_run(row: sqlite3.Row) -> dict:
         "count": row["opponent_count"],
         "turns": row["turns"],
         "seed": row["seed"],
+        "demo": bool(row["demo"]) if "demo" in row.keys() else False,
         "actions": [part for part in row["actions"].split(".") if part],
         # Split rather than filtered: the strings are positional against
         # ``actions``, so a match with no guesses still occupies its slot.
@@ -250,7 +279,9 @@ def export_csv() -> bytes:
     """The whole table as CSV -- the teacher's backup and the class spreadsheet.
 
     Written with a UTF-8 BOM: these files open in Excel in Chinese classrooms,
-    and without it every 班级码 arrives as mojibake.
+    and without it every 班级码 arrives as mojibake. The ``demo`` column travels
+    with the rows, so a spreadsheet handed to a judge still says which submissions
+    were generated by a script.
     """
     buffer = io.StringIO(newline="")
     writer = csv.DictWriter(buffer, fieldnames=COLUMNS)
@@ -259,6 +290,7 @@ def export_csv() -> bytes:
         for row in connection.execute("SELECT * FROM runs ORDER BY created_at"):
             record = dict(row)
             record["tutorial_done"] = "1" if record["tutorial_done"] else "0"
+            record["demo"] = "1" if record["demo"] else "0"
             writer.writerow({name: record[name] for name in COLUMNS})
     return buffer.getvalue().encode("utf-8-sig")
 
@@ -282,8 +314,8 @@ def import_csv(data: bytes) -> int:
             connection.execute(
                 "INSERT OR REPLACE INTO runs (join_code, class_code, challenge_id,"
                 " created_at, updated_at, engine_version, opponent_count, turns,"
-                " seed, actions, predictions, tutorial_done, status)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " seed, actions, predictions, tutorial_done, status, demo)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     code,
                     (record.get("class_code") or "").strip(),
@@ -298,10 +330,32 @@ def import_csv(data: bytes) -> int:
                     (record.get("predictions") or "").strip(),
                     int(record.get("tutorial_done") == "1"),
                     record.get("status") or "playing",
+                    # A CSV exported before the flag existed holds no ``demo``
+                    # column at all; those rows are real submissions.
+                    int(record.get("demo") == "1"),
                 ),
             )
             inserted += 1
     return inserted
+
+
+def demo_runs() -> int:
+    """How many stored submissions were generated by the demo roster script."""
+    with connect() as connection:
+        return connection.execute(
+            "SELECT COUNT(*) FROM runs WHERE demo = 1").fetchone()[0]
+
+
+def clear_demo_runs() -> int:
+    """Delete every simulated submission and return the count. Real rows untouched.
+
+    The demo batch exists to make one screen explainable, not to sit in the file.
+    A teacher who has run it and now wants a real class needs the one command that
+    says "back to what this class actually did".
+    """
+    with connect() as connection:
+        cursor = connection.execute("DELETE FROM runs WHERE demo = 1")
+    return cursor.rowcount
 
 
 # --- Challenges -----------------------------------------------------------

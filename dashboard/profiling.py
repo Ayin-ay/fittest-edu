@@ -44,6 +44,9 @@ class Dimension:
     measurement: str          # what was counted
     value: str                # the number, formatted for display
     detail: str               # how to read it, in plain language
+    # The name a textbook would use for what this axis measures. It is a pointer
+    # for the reader, not a verdict: no dimension may be read as a trait.
+    concept: str = ""
     evidence: list[str] = field(default_factory=list)
     counterfactual: str = ""  # what would have refuted it
     contradicts: list[str] = field(default_factory=list)
@@ -53,6 +56,8 @@ class Dimension:
     def to_markdown(self) -> str:
         lines = ["### {}".format(self.title)]
         lines.append("")
+        if self.concept:
+            lines.append("- **课本概念**：{}".format(self.concept))
         lines.append("- **测量方式**：{}".format(self.measurement))
         lines.append("- **结果**：{}".format(self.value))
         lines.append("- **含义**：{}".format(self.detail))
@@ -103,6 +108,7 @@ def dim_opening(matches: list[Decision]) -> Dimension:
     return Dimension(
         key="opening",
         title="开局倾向：在没有任何信息时的第一手",
+        concept="冷启动：无信息条件下的第一手（合作作为信号）",
         measurement="统计 10 场对战的第一轮出招（此时对手尚未展示任何行为）",
         value="{} / {} 场首轮合作（{:.0%}）".format(opens, len(firsts),
                                              opens / max(len(firsts), 1)),
@@ -146,6 +152,7 @@ def dim_retaliation(matches: list[Decision], by_match: dict[int, Match]) -> Dime
     return Dimension(
         key="retaliation",
         title="对背叛的即时反应",
+        concept="触发策略：以牙还牙与一次性报复",
         measurement="统计对手上一轮背叛后、玩家接着出背叛的比例（共 {} 次被背叛）".format(len(provoked)),
         value="{} / {} 次回击（{:.0%}）；另有 {} 次选择继续合作".format(
             len(retaliated), len(provoked), rate, len(forgave)),
@@ -194,6 +201,7 @@ def dim_exploitation(matches: list[Decision]) -> Dimension:
     return Dimension(
         key="exploitation",
         title="主动剥削：在对手合作时出手",
+        concept="占优策略的收益上限（T−R）",
         measurement="统计对手上一轮合作（非第 1 轮）时、玩家出背叛的比例（共 {} 次机会）".format(len(unprovoked)),
         value="{} / {} 次（{:.0%}），这些出手带来的即时净收益合计 {:+.0f} 分".format(
             len(exploits), len(unprovoked), rate, gained),
@@ -245,6 +253,7 @@ def dim_discrimination(matches: list[Decision], by_match: dict[int, Match]) -> D
     return Dimension(
         key="discrimination",
         title="区分度：对不同对手是否区别对待",
+        concept="策略间的克制关系（没有全局最优打法）",
         measurement="按对手在本场的实际背叛率分组，比较玩家「被背叛后回击」的比例",
         value="各组回击率 " + "、".join(
             "{} {:.0%}".format(a, r) for a, _, _, r in rows if _) + "；极差 {:.0%}".format(spread),
@@ -280,6 +289,7 @@ def dim_endgame(matches: list[Decision]) -> Dimension:
     return Dimension(
         key="endgame",
         title="终局意识：明知无后续时的出手",
+        concept="逆向归纳与有限期的终局坍塌",
         measurement="比较第 1-2 轮与第 8-10 轮（及末轮）的背叛率",
         value="前段背叛率 {:.0%}，后段 {:.0%}，末轮 {} / {} 场背叛（变化 {:+.0%}）".format(
             early_rate, late_rate, final_d, len(final_round), shift),
@@ -316,6 +326,7 @@ def dim_punishment_duration(by_match: dict[int, Match]) -> Dimension:
     return Dimension(
         key="punishment_duration",
         title="回击的持续长度",
+        concept="惩罚长度与冷酷策略的可持续性",
         measurement="统计每次「被背叛后转为连续背叛」的段长（共 {} 段）".format(len(runs)),
         value="共 {} 段，平均 {:.1f} 轮，最长 {}".format(
             len(runs), mean_run, max(runs) if runs else 0),
@@ -346,6 +357,7 @@ def dim_score_efficiency(matches: list[Decision], by_match: dict[int, Match]) ->
     return Dimension(
         key="efficiency",
         title="收益效率：单步最优与实际出手的差距",
+        concept="阶段最优与合作剩余的取舍",
         measurement="逐步比较所选出手与另一手在同一局面下的即时得分，累加差额",
         value="实际总分 {:.0f}；放弃的即时收益 {:.0f} 分，赚到 {:+.0f} 分；单步最优可达 {:.0f}，你拿到 {:.0%}".format(
             player_total, given_up, gained, ceiling, efficiency),
@@ -393,6 +405,7 @@ def dim_leverage(matches: list[Decision], by_match: dict[int, Match]) -> Dimensi
     return Dimension(
         key="leverage",
         title="影响力：你的选择是否真的改变了对手",
+        concept="重复博弈中的激励：你的现在手决定对手的未来手",
         measurement="逐步比较「按你实际出招」与「改出另一手」两种情况下，对手下一轮的动作",
         value="{} / {} 步产生了不同的对手反应（{} 步推向背叛，{} 步拉回合作）".format(
             len(moved), len(matches), toward_d, toward_c),
@@ -448,6 +461,7 @@ def dim_consistency(by_match: dict[int, Match]) -> Dimension:
     return Dimension(
         key="consistency",
         title="一致性：相同局面下是否重复自己",
+        concept="可预测性与被利用（策略的公开性）",
         measurement="按（对手类型、本轮次、是否被背叛）分组，找出重复出现的局面并比较出手",
         value=("{} 个重复局面，一致率 {:.0%}".format(len(repeated), rate)
                if rate is not None else "无重复局面"),

@@ -3,7 +3,5 @@ plotly>=5.18
 matplotlib>=3.8
 numpy>=1.24
 pandas>=2.0
-# 出牌风格卡：Pillow 出图，qrcode 在卡角画二维码（qrcode 依赖 Pillow）。
-# 没有 qrcode 时卡片照样出，只是少一个角标——见 dashboard/share_card.py。
+# 图标生成脚本 docs/brand/build_icon.py 依赖 Pillow；线上对局本身不出图。
 Pillow>=10.0
-qrcode>=7.4
