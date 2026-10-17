@@ -151,6 +151,8 @@ PLANS = {
     # stays as the safety net for gateways that ignore the hint.
     #
     # A non-reasoning model never fills either, so neither costs anything there.
+    # That ceiling is only about models that actually think -- see
+    # REASONING_MARKERS for why the hint is not sent to the others.
     "full": (SYSTEM_PROMPT, "", 16384),
 }
 
@@ -158,6 +160,23 @@ PLANS = {
 #: (verified: no 400, ~4-5x faster). Not every provider supports it, so a 400
 #: mentioning it drops the key and retries, exactly like the temperature override.
 REASONING_EFFORT = "low"
+
+#: Names that say the model thinks before it writes. The hint is only sent to
+#: those, because on a hybrid endpoint the hint *is* the thinking switch:
+#: measured against DeepSeek's official API, ``deepseek-chat`` with
+#: ``reasoning_effort: low`` streamed 36 ``reasoning_content`` chunks and one
+#: content chunk, and the same request without it streamed zero reasoning. In
+#: other words, asking a non-reasoning model to reason less made it start
+#: reasoning — and a long five-section report then spends the whole token
+#: ceiling on thinking and arrives as ``finish_reason=length`` with no body.
+REASONING_MARKERS = ("reasoner", "r1", "think", "qwq", "v4-flash", "o1-", "o3-")
+
+
+def wants_reasoning_hint(model: str) -> bool:
+    """True when ``reasoning_effort`` should be sent for this model name."""
+    name = (model or "").lower()
+    return any(marker in name for marker in REASONING_MARKERS)
+
 
 # Some gateways reject anything but ``temperature: 1`` with a 400, so a model
 # that would otherwise work becomes unusable. Retry once without the override
@@ -631,8 +650,9 @@ def stream_text(system_prompt: str, user_prompt: str, *,
         "temperature": 0.5,
         "max_tokens": max_tokens,
         "stream": True,
-        "reasoning_effort": REASONING_EFFORT,
     }
+    if wants_reasoning_hint(model):
+        body["reasoning_effort"] = REASONING_EFFORT
     return _stream_body(
         url.rstrip("/") + "/chat/completions", body, key, config, plan,
         connect_timeout, read_timeout,
@@ -689,8 +709,9 @@ def stream_analysis(
         "temperature": 0.5,
         "max_tokens": max_tokens,
         "stream": True,
-        "reasoning_effort": REASONING_EFFORT,
     }
+    if wants_reasoning_hint(chosen):
+        body["reasoning_effort"] = REASONING_EFFORT
     return _stream_body(
         url.rstrip("/") + "/chat/completions", body, key, config, plan,
         connect_timeout, read_timeout, proxy, app_url,
