@@ -395,6 +395,11 @@ html, body, .stApp, [class*="css"] {
   font-weight: 680;
   font-variant-numeric: tabular-nums;
 }
+/* The "?" for these numbers lives in the strip's own top padding: the row of
+   three cards is a fixed grid, so a fourth child would wrap onto an empty
+   second line and read as another outcome. */
+.tf-payoffs { position: relative; }
+.tf-payoffs > .tf-help { position: absolute; top: .25rem; right: .1rem; }
 
 /* Section header: heading plus its one-line gloss on the same baseline. The
    top margin is the rhythm between landing sections. */
@@ -921,6 +926,47 @@ a { color: #2E7DE4; }
   line-height: 1.5;
   color: %(faint)s;
 }
+/* The identity card's "here is where its rule showed up" rows. They exist to
+   turn a defeat into a reading of the rules, so they sit under the module list
+   rather than beside the score. */
+.tf-ident__name {
+  font-size: .95rem;
+  font-weight: 700;
+  color: #241F1A;
+}
+.tf-echo {
+  margin-top: .6rem;
+  padding-top: .5rem;
+  border-top: 1px solid #EFE6D6;
+}
+.tf-echo__k {
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: #6B6156;
+}
+.tf-echo__row {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .6rem;
+  align-items: baseline;
+  padding: .32rem 0;
+  font-size: .86rem;
+  line-height: 1.55;
+}
+.tf-echo__turn {
+  font-size: .72rem;
+  font-weight: 700;
+  color: #241F1A;
+  background: #F6F0E6;
+  border-radius: 5px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.tf-echo__row em { color: #6B6156; font-style: normal; }
+.tf-echo__act { font-style: normal; font-weight: 700; }
+.tf-echo__act--c { color: #2E7DE4; }
+.tf-echo__act--d { color: #E4572E; }
 .tf-track {
   height: .4rem;
   border-radius: 999px;
@@ -966,6 +1012,37 @@ a { color: #2E7DE4; }
 }
 .tf-cue--defect { color: #B4451F; font-weight: 600; }
 .tf-cue--defect i { background: #E4572E; }
+
+/* The optional "guess what it will play" row. It sits above the two buttons
+   because the guess has to be made before committing, and it stays visually
+   quieter than the buttons themselves: a player who skips it loses nothing.
+   Hit and miss are ink and muted, not green and red -- colour here means
+   cooperation or defection and nothing else. */
+.tf-predict {
+  display: flex;
+  align-items: baseline;
+  gap: .55rem;
+  flex-wrap: wrap;
+  margin: -.1rem 0 .55rem;
+  font-size: .84rem;
+  color: %(muted)s;
+}
+.tf-predict b { color: %(ink)s; font-weight: 700; }
+.tf-pred {
+  display: flex;
+  align-items: baseline;
+  gap: .4rem;
+  flex-wrap: wrap;
+  margin: .3rem 0 .2rem;
+  padding: .42rem .6rem;
+  border: 1px dashed %(line)s;
+  border-radius: 9px;
+  background: %(raised)s;
+  font-size: .84rem;
+  color: %(muted)s;
+}
+.tf-pred__mark { font-weight: 700; color: %(ink)s; }
+.tf-pred__score { margin-left: auto; font-variant-numeric: tabular-nums; }
 
 /* Running score. A player wants this after every turn, and it used to live
    only inside the history table further down the page. */
@@ -1233,7 +1310,7 @@ details.tf-help[open] > summary { background: #2E7DE4; color: #FBF7F0; }
   .tf-hero .tf-title { font-size: 1.85rem !important; }
   .tf-lede { font-size: .95rem; }
   .tf-payoffs, .tf-arch, .tf-steps, .tf-gloss { grid-template-columns: 1fr; }
-  .tf-payoffs { margin-bottom: 2rem; }
+  .tf-payoffs { margin-bottom: 2rem; padding-top: 2.5rem; }
   .tf-arch > div { border-left: 0; padding: 1rem 0; border-top: 1px solid #E4DACA; }
   .tf-arch > div:first-child { border-top: 0; padding-top: 0; }
   .tf-move button, .st-key-tf_move_coop button,
@@ -1485,12 +1562,18 @@ def landing_hero(
     return words + hero_art() + "</div>"
 
 
-def payoff_chips() -> str:
+def payoff_chips(help_html: str = "") -> str:
+    """The three payoff outcomes, as cards.
+
+    ``help_html`` is the caller's in-place ``?`` explainer, appended inside the
+    same block so the gloss belongs to the numbers rather than to whatever
+    heading comes next.
+    """
     cells = "".join(
         '<div class="tf-pay">{}<p>{}<b>{}</b></p></div>'.format(icon, label, value)
         for icon, label, value in PAYOFF_ICONS
     )
-    return '<div class="tf-payoffs">{}</div>'.format(cells)
+    return '<div class="tf-payoffs">{}{}</div>'.format(cells, help_html)
 
 
 def mode_card(

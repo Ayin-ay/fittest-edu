@@ -71,6 +71,10 @@ class Decision:
     # Whether the opponent was still "new" from the player's point of view.
     is_first_round: bool = False
     is_final_round: bool = False
+    # What the player guessed this turn would be, "-" when they skipped the
+    # guess. Optional by design: guessing is a second exercise, not a precondition
+    # for playing, and a blank must stay distinguishable from a wrong answer.
+    prediction: str = "-"
 
     @property
     def provoked(self) -> bool:
@@ -98,6 +102,10 @@ class Match:
     opponent_defection_rate: float
     mutual_cooperations: int
     decisions: list[Decision] = field(default_factory=list)
+    #: One character per turn, aligned with ``player_actions``: the turn's guess,
+    #: or "-" where the player did not guess. Kept as a string so it persists and
+    #: replays exactly like the decisions do.
+    predictions: str = ""
 
     @property
     def player_coop_rate(self) -> float:
@@ -228,6 +236,35 @@ def action_cue(their_action: str) -> str:
         " tf-cue--defect" if defect else "", text)
 
 
+def prediction_note(prediction: str, opponent_action: str,
+                    guesses: int, hits: int) -> str:
+    """One line about the guess the player just made, next to what actually happened.
+
+    Shown after the turn resolves, never before: the engine can compute the
+    opponent's real move (``opponent_next_action``), and displaying anything built
+    from that would hand the student the answer to the exercise the guess is.
+    """
+    if prediction == "-":
+        return (
+            "<div class='tf-pred'><span>这一轮没有猜。</span>"
+            "<span class='tf-pred__score'>本局已猜 %d 次，中 %d 次</span></div>"
+            % (guesses, hits)
+        )
+    names = {"C": "合作", "D": "背叛"}
+    hit = prediction == opponent_action
+    return (
+        "<div class='tf-pred'><span class='tf-pred__mark'>%s</span>"
+        "<span>你猜它 %s，它出的是 %s</span>"
+        "<span class='tf-pred__score'>本局已猜 %d 次，中 %d 次</span></div>"
+        % (
+            "猜中了" if hit else "没猜中",
+            names.get(prediction, prediction),
+            names.get(opponent_action, opponent_action),
+            guesses, hits,
+        )
+    )
+
+
 def stage_strip(
     match_count: int,
     outcomes: list[tuple[float, float]],
@@ -292,11 +329,61 @@ def stage_strip(
     )
 
 
+def _alternative_cell(decision: Decision | None) -> str:
+    """One turn's counterfactual, in the same row as the turn it belongs to.
+
+    The engine already records what the unchosen move paid and what it would have
+    done to the opponent's next round (``Decision`` fields 9-13), but that only
+    ever reached the nine measurements and the last turn's caption. Seeing it per
+    turn is the point of the exercise: a "mistake" that bought the opponent's
+    cooperation next round is not the same mistake as one that bought nothing.
+
+    The numbers stay in ``INK`` on purpose. Colour here means cooperation or
+    defection and nothing else, so a green/red delta would read as 对/错 --
+    this is a score table, not a verdict.
+    """
+    from dashboard import theme
+
+    if decision is None:
+        return "<span style='color:{}'>—</span>".format(theme.MUTED)
+
+    other = decision.alternative
+    word = "合作" if other == "C" else "背叛"
+    hue = theme.COOP if other == "C" else theme.DEFECT
+    delta = decision.immediate_delta
+    if delta > 0:
+        gap = "多 {} 分".format(_whole(delta))
+    elif delta < 0:
+        gap = "少 {} 分".format(_whole(-delta))
+    else:
+        gap = "同分"
+    cell = (
+        "<div><b style='color:{}'>{}</b> 可得 {}，<b>{}</b></div>".format(
+            hue, word, _whole(decision.alternative_payoff), gap)
+    )
+    moved = (
+        not decision.is_final_round
+        and decision.opponent_next_if_chosen
+        != decision.opponent_next_if_alternative
+    )
+    if moved:
+        # Only the branch that *changes* something gets a second line: ten rows
+        # of 它下一轮不变 would bury the two turns where the choice mattered.
+        # 若改选 is spelled out because the line sits under a number that is
+        # already about the other move -- readers took it for a forecast.
+        cell += "<div><span style='color:{}'>若改选，它下轮出{}</span></div>".format(
+            theme.DEFECT if decision.opponent_next_if_alternative == "D"
+            else theme.COOP,
+            "背叛" if decision.opponent_next_if_alternative == "D" else "合作")
+    return cell
+
+
 def history_table(
     mine: str,
     theirs: str,
     turns: int | None = None,
     highlight: int | None = None,
+    decisions: list[Decision] | None = None,
 ) -> str:
     """Per-turn history as a readable table.
 
@@ -304,6 +391,10 @@ def history_table(
     decoded, the two sides sit on one line, and there is no sign of who scored
     what. This lays it out one turn per row with the words 合作/背叛, the
     payoff for that round, and a running total.
+
+    ``decisions`` -- the turn's :class:`Decision` objects, in order -- adds the
+    另一手 column. Callers that only have the two action strings (the tutorial,
+    records written before matches were kept whole) simply leave it out.
     """
     from dashboard import theme
     from trust_evolution_simulation import PAYOFFS
@@ -340,6 +431,10 @@ def history_table(
                 theme.INK, _whole(my_running), theme.MUTED, _whole(their_running))
         else:
             running = "<span style='color:%s'>—</span>" % theme.MUTED
+        given = (
+            decisions[turn]
+            if decisions is not None and turn < len(decisions) else None
+        )
         body.append(
             "<tr style='{row}'>"
             "<td style='text-align:center;color:{muted}'>{turn}</td>"
@@ -348,10 +443,16 @@ def history_table(
             "<td style='text-align:center'>{points}</td>"
             "<td style='text-align:center'>{outcome}</td>"
             "<td style='text-align:center'>{running}</td>"
+            "{alternative}"
             "</tr>".format(
                 row=row_style, turn=turn + 1, mine=my_cell,
                 theirs=their_cell, points=points, outcome=outcome,
                 running=running,
+                alternative=(
+                    "<td style='text-align:left;font-size:14px;white-space:nowrap;"
+                    "padding-left:10px'>{}</td>".format(_alternative_cell(given))
+                    if decisions is not None else ""
+                ),
                 muted=theme.MUTED,
             )
         )
@@ -370,6 +471,7 @@ def history_table(
         + head_cell("本轮得分<br>你/对手")
         + head_cell("本轮结果")
         + head_cell("本局累计<br>你/对手")
+        + (head_cell("另一手<br>本可得分") if decisions is not None else "")
     )
     # The margin rather than a repeat of the totals: the last row of the 本局累计
     # column already gives both numbers, so a 合计 line underneath only doubled it.
@@ -382,8 +484,9 @@ def history_table(
         colour, summary = theme.MUTED, "双方持平"
     return (
         "<div style='overflow-x:auto;margin:0.4rem 0 0.8rem'>"
-        "<table style='border-collapse:collapse;width:100%;max-width:760px;"
-        "font-size:15px'>"
+        "<table style='border-collapse:collapse;width:100%;max-width:"
+        + str(880 if decisions is not None else 760)
+        + "px;font-size:15px'>"
         "<thead><tr>" + headers + "</tr></thead>"
         "<tbody>" + "".join(body) + "</tbody></table>"
         "<div style='color:" + colour + ";font-size:14px;font-weight:600;"
@@ -447,7 +550,63 @@ def matches_overview(matches: list[Match]) -> str:
     )
 
 
-def identity_card(code: str) -> str:
+def _echo_move(action: str) -> str:
+    """One action word, coloured the same way as every other action on the page."""
+    return "<i class='tf-echo__act tf-echo__act--{}'>{}</i>".format(
+        "c" if action == "C" else "d", "合作" if action == "C" else "背叛")
+
+
+#: Three pointers are enough to show a rule running; ten rows nobody reads.
+ECHO_LIMIT = 3
+
+
+def rule_echo(match: Match) -> list[tuple[str, str]]:
+    """The turns where the opponent's own rule is visible in this match.
+
+    Read off the two action strings the match already stores, so every line here
+    is something the table above it shows: 第 N 轮它出了什么，你上一轮出了什么. It says
+    紧跟 / 对应, never 因为它想 -- the rule text above the list is what carries intent,
+    and a revealed rule is still a rule, not a motive.
+    """
+    mine, theirs = match.player_actions, match.opponent_actions
+    if not mine or not theirs:
+        return []
+
+    marks: dict[str, tuple[int, str]] = {}
+
+    def note(kind: str, turn: int, text: str) -> None:
+        if kind not in marks:
+            marks[kind] = (turn, text)
+
+    for index, their_action in enumerate(theirs):
+        turn = index + 1
+        previous_mine = mine[index - 1] if index else None
+        previous_theirs = theirs[index - 1] if index else None
+        if their_action == "D" and previous_mine != "D":
+            if previous_mine is None:
+                note("主动出手", turn, "开局第一轮它就出了{}——那时你手上没有任何信息。".format(
+                    _echo_move("D")))
+            else:
+                note("主动出手", turn, "它出{}，而你上一轮出的是{}。".format(
+                    _echo_move("D"), _echo_move(previous_mine)))
+        elif their_action == "D":
+            note("回应你的背叛", turn, "它出{}，紧跟在你第 {} 轮的{}之后。".format(
+                _echo_move("D"), index, _echo_move("D")))
+        elif their_action == "C" and previous_theirs == "D":
+            note("回到合作", turn, "它转回{}，而你这轮出的是{}。".format(
+                _echo_move("C"), _echo_move(mine[index])))
+
+    if not marks:
+        return [("全程", "它这 {} 轮一次也没有{}过。".format(
+            len(theirs), _echo_move("D")))]
+    ordered = sorted(marks.items(), key=lambda item: item[1][0])[:ECHO_LIMIT]
+    return [
+        ("第 {} 轮".format(turn), "{}：{}".format(kind, text))
+        for kind, (turn, text) in ordered
+    ]
+
+
+def identity_card(code: str, match: Match | None = None) -> str:
     """The opponent's identity, revealed once its match is over.
 
     It used to be a ``st.container(border=True)`` holding a bullet list, which
@@ -455,8 +614,11 @@ def identity_card(code: str) -> str:
     grouping, and the code string lost at the end of a caption. Here the code
     and the label come first as the card's spine, and each module is a row with
     its slot as a chip so the three kinds stay distinguishable at a glance.
+
+    ``match`` adds the 回指 list: the same rule text, but pointing at the two or
+    three turns of this match where it can be seen running.
     """
-    from dashboard import theme
+    from dashboard.naming import generate_name
     from dashboard.strategy_detail import parse_strategy_detail
 
     rows = []
@@ -467,16 +629,33 @@ def identity_card(code: str) -> str:
             "<div class='tf-rule__body'><b>{}</b><span>{}</span></div>"
             "</div>".format(slot, module_name, text)
         )
+    echo = ""
+    if match is not None:
+        lines = rule_echo(match)
+        if lines:
+            echo = (
+                "<div class='tf-echo'><div class='tf-echo__k'>"
+                "它的规则在这一局里出现在</div>{}</div>"
+            ).format(
+                "".join(
+                    "<div class='tf-echo__row'><span class='tf-echo__turn'>{}</span>"
+                    "<div><em>{}</em></div></div>".format(turn, text)
+                    for turn, text in lines
+                )
+            )
     return (
         "<div class='tf-ident'>"
         "<div class='tf-ident__head'>"
         "<span class='tf-ident__kicker'>本局对手</span>"
-        "<b class='tf-ident__code'>{}</b>"
+        "<b class='tf-ident__name'>{}</b>"
+        "<span class='tf-ident__code'>{}</span>"
         "<span class='tf-ident__label'>{}</span>"
-        "</div>{}<div class='tf-ident__note'>"
+        "</div>{}{}<div class='tf-ident__note'>"
         "规则在它这一局结束前一直保密；现在可以对照上面的「本局记录」回看它每一步为什么这么出。</div>"
         "</div>"
-    ).format(code, opponent_label(code), "".join(rows))
+    ).format(
+        generate_name(code), code, opponent_label(code), "".join(rows), echo,
+    )
 
 
 def draw_opponents(count: int, seed: int) -> list[str]:
@@ -516,8 +695,21 @@ class PlayerMatchRunner:
         self.player_score = 0.0
         self.opponent_score = 0.0
         self.decisions: list[Decision] = []
+        self.prediction_history: list[str] = []
+        self.pending_prediction: str | None = None
         self._pending_snapshot: StrategyState | None = None
         self._pending_opponent_action: str | None = None
+
+    def set_prediction(self, action: str | None) -> None:
+        """Record what the player thinks the opponent will play this turn.
+
+        The guess has to be read at click time rather than stored on a rerun: it
+        belongs to the turn that is about to be resolved, and a turn the player
+        passed on must stay empty rather than inherit the previous guess.
+        """
+        if action is not None and action not in ("C", "D"):
+            raise ValueError("prediction must be 'C', 'D' or None")
+        self.pending_prediction = action
 
     @property
     def finished(self) -> bool:
@@ -577,6 +769,8 @@ class PlayerMatchRunner:
             raise ValueError("action must be 'C' or 'D'")
 
         turn = self.turn_number
+        prediction = self.pending_prediction or "-"
+        self.pending_prediction = None
         snapshot = self._opponent_state_for_next_move()
         other = "D" if action == "C" else "C"
         next_if_chosen = self._next_reply_under(snapshot, action)
@@ -607,8 +801,10 @@ class PlayerMatchRunner:
             opponent_next_if_alternative=next_if_alternative,
             is_first_round=turn == 1,
             is_final_round=turn == self.turns,
+            prediction=prediction,
         )
         self.decisions.append(decision)
+        self.prediction_history.append(prediction)
 
         self.player_history.append(action)
         self.opponent_history.append(opponent_action)
@@ -661,6 +857,7 @@ class PlayerMatchRunner:
             opponent_defection_rate=opponents_defect / max(len(self.opponent_history), 1),
             mutual_cooperations=mutual,
             decisions=list(self.decisions),
+            predictions="".join(self.prediction_history),
         )
 
 

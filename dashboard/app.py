@@ -108,10 +108,12 @@ from dashboard.ai_analysis import (  # noqa: E402
     stream_text as ai_stream_text,
     stream_analysis as ai_stream,
 )
+from dashboard import challenges  # noqa: E402
 from dashboard import evolution_analysis  # noqa: E402
 from dashboard import store  # noqa: E402
 from dashboard import theme  # noqa: E402
 from dashboard.gameplay import (  # noqa: E402
+    Match,
     PlayerMatchRunner,
     action_cue,
     branch_strip,
@@ -121,6 +123,7 @@ from dashboard.gameplay import (  # noqa: E402
     history_table,
     identity_card,
     matches_overview,
+    prediction_note,
     stage_strip,
     strategy_tournament,
 )
@@ -1306,6 +1309,227 @@ def _enter_mode(mode: str) -> None:
     st.rerun()
 
 
+#: 教师端那一屏的就地解释。和 GAME_HELP 一样：写下的每一句都能在屏幕上找到对应
+#: 的东西，尤其不能写成"我们已经做过课堂试点"。
+BOARD_HELP = [
+    ("这一屏是给谁的",
+     "给带一次课的老师：一个班打完之后，在这里看有多少份提交、打完的有几份、"
+     "同一套题面前谁高谁低。学生那一侧看不到别人的加入码，只看到自己的名次。"),
+    ("为什么只有加入码",
+     "这张表里没有姓名、没有账号、也没有任何能指认到人的列。加入码是一个随机 8 字符，"
+     "它同时是学生取回自己报告的唯一凭据。要把码对回人，只能老师在纸面上自己记。"),
+    ("榜单是怎么算出来的",
+     "库里存的只有设置和每一步决策。每一份提交都在这里按同一套对手、同一颗子重放一遍，"
+     "分数是当场算的——所以榜上不会出现一个和决策脱节的存档数字。"),
+    ("只有同一挑战码才放在一起排",
+     "换一套对手就是换一道题。自由打的局没有共同题面，不进榜；把它们和某套题的提交排在"
+     "一张表里，排的是运气。"),
+    ("「参照」那几行是什么",
+     "S0（永远合作）、SM（永远背叛）、R1-1（以牙还牙）等标准策略，在同一串对手、同一个"
+     "轮数、同一份种子下打出的总分。它们不是标准答案，只是一条对照线：同一套题面上，"
+     "换个打法能拿多少。"),
+    ("看不到任何东西时",
+     "免费版每次重新部署都会清空存档文件。学生提交还在的话，先导出两份 CSV（名单 + 挑战表）"
+     "再重新部署，然后原样导入——加入码不变，学生照常凭码回来。"),
+]
+
+#: 全班参照线里在榜单上露面的条数：太多会把学生的名次挤出视野。
+BOARD_BASELINES = 4
+
+
+def _task_link(challenge_id: str) -> str:
+    """把挑战码带在地址栏里的完整链接。
+
+    学生点开这个链接就已经锁好题面，不需要自己输码；地址取本站当前的外部 URL，
+    读不到就退回相对形式（同一个部署下仍然有效）。
+    """
+    try:
+        base = (st.context.external_url or "").split("?")[0]
+    except Exception:  # noqa: BLE001 - context 在少数嵌入环境下不可用
+        base = ""
+    tail = "{}={}".format(GAME_TASK_PARAM, challenge_id)
+    return "{}?{}".format(base, tail) if base else tail
+
+
+def _rank_table(board: dict) -> list[dict]:
+    """Submissions and reference lines in one score-ordered table.
+
+    名次用的是并列名次（同分同名，下一名跳号）：全班用同一套策略时应该读成"并列"，
+    而不是被任意地排出先后。
+    """
+    scored = [
+        (row["score"], "第 {} 名".format(
+            sum(1 for other in board["rows"] if other["score"] > row["score"]) + 1),
+         row["join_code"], row["updated_at"])
+        for row in board["rows"]
+    ]
+    for line in board["baselines"][:BOARD_BASELINES]:
+        scored.append((
+            line["score"],
+            "第 {} 名".format(line["above"] + 1),
+            "参照 · {}（{}）".format(line["label"], line["code"]),
+            "",
+        ))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [
+        {"名次": place, "提交": who, "总分": "{:g}".format(score),
+         "更新时间": stamp or "—"}
+        for score, place, who, stamp in scored
+    ]
+
+
+def _render_board_summary(runs: list[dict]) -> None:
+    """这个班现在打到哪儿了：份数、打完的、还在打的、一共走了多少步。
+
+    只数提交和决策步数——这两个数决定了榜能不能算、一节课够不够打完，而且它们不需要
+    重放，所以这一排数字是即时的。
+    """
+    playing = sum(1 for run in runs if run["status"] == "playing")
+    steps = sum(sum(len(a) for a in run["actions"]) for run in runs)
+    guessed = sum(
+        sum(1 for mark in part if mark in ("C", "D"))
+        for run in runs for part in run.get("predictions", [])
+    )
+    count_col, done_col, live_col, step_col = st.columns(4)
+    count_col.metric("提交份数", len(runs))
+    done_col.metric("已打完", len(runs) - playing)
+    live_col.metric("进行中", playing)
+    step_col.metric(
+        "决策步数", steps,
+        help="全部提交里已经落子的轮数总和。开了「每轮先猜对手出什么」的那些轮，"
+             "另有 {} 次猜测记录。".format(guessed) if guessed else
+             "全部提交里已经落子的轮数总和。",
+    )
+
+
+def _render_challenge_board(runs: list[dict]) -> None:
+    """Per-challenge standings for the filtered set of runs."""
+    groups: dict[str, list[dict]] = {}
+    for run in runs:
+        if run["challenge_id"]:
+            groups.setdefault(run["challenge_id"], []).append(run)
+    if not groups:
+        st.caption(
+            "这批提交里没有挑战局的记录。自由打的局各用各的对手集合，没有共同分母，"
+            "所以不进榜——要排名，先在下面发一份挑战出去。")
+        return
+    for task_id, group in groups.items():
+        challenge = _resolve_challenge(task_id)
+        st.markdown("**挑战 {}**　{} 份提交".format(
+            task_id, len(group)))
+        if challenge is None:
+            st.caption(
+                "这份挑战的题面不在这里（可能是另一个实例自建的，或已被删除），"
+                "无法重放评分。导入挑战表 CSV 就能恢复它。")
+            continue
+        try:
+            board = challenges.ranking(challenge, group)
+        except (sqlite3.Error, OSError, ValueError) as error:
+            st.warning("这一份算不出来：{}".format(error))
+            continue
+        if not board["rows"]:
+            st.caption("这个挑战下还没有一份打完的提交——上面那几行是参照线本身。")
+        st.dataframe(_rank_table(board), width="stretch", hide_index=True)
+        st.caption(
+            "题面：{} 局 × 每局 {} 轮 = {} 步，种子 {}。全部提交都在同一套对手上重放算出。".format(
+                len(challenge["codes"]), challenge["turns"],
+                challenges.steps(challenge), challenge["seed"]))
+
+
+def _render_issue_desk() -> None:
+    """下发：预置挑战的链接，和老师自己编的一份挑战。"""
+    st.markdown("**下发一份挑战**")
+    for preset in challenges.PRESETS:
+        name_col, link_col = st.columns([4, 6], gap="small")
+        with name_col:
+            st.markdown(
+                "<div style='padding:.2rem 0'><b>{}</b>"
+                "<div style='font-size:.78rem;color:{}'>{}</div></div>".format(
+                    preset["title"], theme.FAINT,
+                    "{} 局 × {} 轮".format(
+                        len(preset["codes"]), preset["turns"])),
+                unsafe_allow_html=True,
+            )
+        with link_col:
+            st.text_input(
+                "链接", value=_task_link(preset["challenge_id"]),
+                key="link_{}".format(preset["challenge_id"]),
+                label_visibility="collapsed",
+                help="发给学生点开就已经锁好题面。挑战码 {}。".format(
+                    preset["challenge_id"]),
+            )
+
+    with st.expander("自己编一份题面", expanded=False):
+        st.caption(
+            "一行一个对手编码（本站的写法，例如 R1-1、S0+R1-1、BS2）。"
+            "编码会先解析一遍再存：读不通的题面不会半成品地上线——"
+            "两班拿到同一标题却不同的对手集合，比报错更难查。")
+        own_title = st.text_input("标题", placeholder="例如 我们班的第三课", key="own_title")
+        own_codes = st.text_area(
+            "对手编码", placeholder="R1-1\nS0\nBS2\nC1", key="own_codes", height=140)
+        own_note = st.text_input(
+            "简介（学生开局前看得到）",
+            placeholder="这一套对手的行为倾向……", key="own_note", max_chars=120)
+        turns_col, seed_col = st.columns(2)
+        with turns_col:
+            own_turns = st.slider("每局轮数", 5, 20, 8, key="own_turns")
+        with seed_col:
+            own_seed = st.number_input(
+                "随机种子", value=20261017, step=1, key="own_seed",
+                help="同一份种子 + 同一串编码 = 全班同一道题。")
+        own_class = st.text_input("班级码（可留空）", key="own_class", max_chars=24)
+        if st.button("保存这份挑战", type="primary", width="stretch"):
+            try:
+                codes = challenges.validate_codes(own_codes)
+                challenge = {
+                    "challenge_id": challenges.new_challenge_id(),
+                    "title": own_title.strip()[:40] or "未命名挑战",
+                    "class_code": own_class.strip()[:24],
+                    "codes": codes,
+                    "turns": int(own_turns),
+                    "seed": int(own_seed),
+                    "note": own_note.strip()[:120],
+                }
+                store.create_challenge(challenge)
+            except (ValueError, sqlite3.Error, OSError) as error:
+                st.error("没能保存：{}".format(error))
+            else:
+                st.session_state["own_created"] = challenge
+                st.rerun()
+
+        made = st.session_state.get("own_created")
+        if made:
+            st.success("已保存：{}（挑战码 {}）".format(
+                made["title"], made["challenge_id"]))
+            st.text_input(
+                "链接", value=_task_link(made["challenge_id"]),
+                key="link_new", label_visibility="collapsed")
+
+        try:
+            saved = store.list_challenges()
+        except (sqlite3.Error, OSError) as error:
+            st.warning("自建挑战读不出来：{}".format(error))
+            saved = []
+        if saved:
+            st.markdown("**已自建的{}份**".format(len(saved)))
+            for item in saved:
+                row_a, row_b = st.columns([5, 7], gap="small")
+                with row_a:
+                    st.markdown(
+                        "<div style='padding:.2rem 0'><b>{}</b>"
+                        "<div style='font-size:.78rem;color:{}'>{} · {} 局 × {} 轮 · 种子 {}{}</div></div>".format(
+                            item["title"], theme.FAINT, item["challenge_id"],
+                            len(item["codes"]), item["turns"], item["seed"],
+                            "　" + item["class_code"] if item["class_code"] else ""),
+                        unsafe_allow_html=True,
+                    )
+                with row_b:
+                    st.text_input(
+                        "链接", value=_task_link(item["challenge_id"]),
+                        key="link_saved_{}".format(item["challenge_id"]),
+                        label_visibility="collapsed")
+
+
 def _render_roster_panel() -> None:
     """名单导出 / 导入——免费版文件系统是临时的，这条路径是唯一的兜底。
 
@@ -1342,6 +1566,15 @@ def _render_roster_panel() -> None:
                         st.error("教师码不对")
             return
 
+        st.markdown(
+            theme.heading(
+                "教师端：班级看板与名单", 3,
+                help_blocks=BOARD_HELP, help_label="这一屏怎么用",
+            ),
+            unsafe_allow_html=True,
+        )
+        _render_issue_desk()
+
         try:
             runs = store.list_runs()
         except (sqlite3.Error, OSError) as error:
@@ -1351,28 +1584,36 @@ def _render_roster_panel() -> None:
         if not runs:
             st.caption("名单库还是空的。学生开始一局后这里就会有记录。")
         else:
-            playing = sum(1 for run in runs if run["status"] == "playing")
-            finished = len(runs) - playing
-            classes = {run["class_code"] for run in runs if run["class_code"]}
-            st.caption(
-                "共 {} 局：已完成 {}、进行中 {}；班级码 {} 个。".format(
-                    len(runs), finished, playing, len(classes))
-            )
-            st.dataframe(
-                [
-                    {
-                        "加入码": run["join_code"],
-                        "班级码": run["class_code"] or "—",
-                        "状态": "已完成" if run["status"] == "finished" else "进行中",
-                        "局数": run["count"],
-                        "每局轮数": run["turns"],
-                        "已打决策": sum(len(a) for a in run["actions"]),
-                        "更新时间": run["updated_at"],
-                    }
-                    for run in runs
-                ],
-                width="stretch", hide_index=True,
-            )
+            classes = sorted({run["class_code"] for run in runs if run["class_code"]})
+            picked = st.selectbox(
+                "班级码", ["全部班级"] + classes, key="board_class",
+                help="只筛选，不改变任何数据。没有填班级码的提交在「全部班级」下看。")
+            shown = [
+                run for run in runs
+                if picked == "全部班级" or run["class_code"] == picked
+            ]
+            _render_board_summary(shown)
+            _render_challenge_board(shown)
+            with st.expander("逐份提交（加入码原样列出）", expanded=False):
+                st.caption(
+                    "这一张表里只有码、题面参数和决策串。九项测量与比分都不在库里，"
+                    "拿到这行数据的人要重算才有——所以它不是一份档案。")
+                st.dataframe(
+                    [
+                        {
+                            "加入码": run["join_code"],
+                            "班级码": run["class_code"] or "—",
+                            "挑战码": run["challenge_id"] or "—",
+                            "状态": "已完成" if run["status"] == "finished" else "进行中",
+                            "局数": run["count"],
+                            "每局轮数": run["turns"],
+                            "已打决策": sum(len(a) for a in run["actions"]),
+                            "更新时间": run["updated_at"],
+                        }
+                        for run in shown
+                    ],
+                    width="stretch", hide_index=True,
+                )
 
         out_col, in_col = st.columns(2)
         with out_col:
@@ -1395,6 +1636,37 @@ def _render_roster_panel() -> None:
                 else:
                     st.success(
                         "已恢复 {} 条记录。加入码不变，学生照常凭码回来。".format(count))
+
+        # 两张表要一起备份：名单里的 challenge_id 指的是挑战表里的题面，只导一份的话
+        # 恢复回来的提交会挂在一份不存在的题面上，榜算不出来，而页面看不出为什么。
+        task_out, task_in = st.columns(2)
+        with task_out:
+            try:
+                payload = store.export_challenges_csv()
+                problem = ""
+            except (sqlite3.Error, OSError) as error:
+                payload = b""
+                problem = str(error)
+            st.download_button(
+                "⬇ 导出挑战表 CSV",
+                data=payload,
+                file_name="fittest-challenges.csv",
+                mime="text/csv",
+                width="stretch",
+                disabled=not payload,
+                help=problem or "老师和预置之外的自建题面都在这里。",
+            )
+        with task_in:
+            task_upload = st.file_uploader(
+                "上传此前导出的挑战表 CSV", type="csv", key="challenge_csv")
+            if task_upload is not None and st.button("恢复这批挑战", key="challenge_import"):
+                try:
+                    saved = store.import_challenges_csv(task_upload.getvalue())
+                except (ValueError, sqlite3.Error, OSError) as error:
+                    st.error("导入失败：{}".format(error))
+                else:
+                    st.success(
+                        "已恢复 {} 份题面。学生手里的挑战码重新可用，榜单也能重放了。".format(saved))
 
 
 def render_mode_select() -> None:
@@ -1430,7 +1702,12 @@ def render_mode_select() -> None:
             if st.button("打开演化工作台", key="landing_lab", width="content"):
                 _enter_mode(MODE_CREATION)
 
-    st.markdown(theme.payoff_chips(), unsafe_allow_html=True)
+    st.markdown(
+        theme.payoff_chips(help_html=theme.help_chip(
+            GAME_HELP["payoff"], label="这些数字怎么读",
+        )),
+        unsafe_allow_html=True,
+    )
 
     st.markdown('<div id="tf_about"></div>', unsafe_allow_html=True)
     # Three collapsible blocks instead of three screens of prose. The heading
@@ -1528,7 +1805,18 @@ STORE_ERROR_KEY = "store_error"
 GAME_PARAM = "g"
 #: 第二个参数：加入码。没有它的话，刷新一次就只剩 URL 能救这一局、名单库不再更新。
 GAME_JOIN_PARAM = "gc"
+#: 第三个参数：挑战码。老师下发的链接带着它，学生点开就已经锁好题面。
+GAME_TASK_PARAM = "task"
 _PAYLOAD_VERSION = "v1"
+#: 挑战局的载荷只带决策——对手集合、轮数、种子都在挑战那一行里，重复一遍就会
+#: 出现两处不一致。所以载荷版本号不同，恢复时也必须同时带 task。
+_PAYLOAD_VERSION_TASK = "v2"
+#: 当前这一局是不是在打某个挑战；存的是解析出来的挑战字典。
+GAME_TASK_KEY = "game_challenge"
+#: 「挑战码」输入框。
+TASK_CODE_KEY = "task_code"
+#: 可选练习：每轮先猜对手出什么。开关本身不进载荷，只跟着这一局走。
+PREDICT_KEY = "game_predict"
 
 #: 就地解释。每一段挂在它自己那个标题旁边，而不是攒成页顶的一篇说明文——
 #: 读者是在读到某一屏时才产生疑问的，把答案放在别处等于没有答案。
@@ -1544,6 +1832,9 @@ GAME_HELP = {
         ("随机种子是干什么的",
          "同一种子生成同一组对手。想和同学比同一套题、或想让评委复现你的结果，"
          "把种子报给对方就行——决策不同，结果才不同。"),
+        ("学习目标",
+         "先决定要从这段对局里读出什么，再决定局数与轮数：样本长度是测量的"
+         "一部分，不是设置项。"),
     ],
     "tutorial": [
         ("这块在做什么",
@@ -1554,6 +1845,9 @@ GAME_HELP = {
         ("可以直接跳过吗",
          "可以。规则就三行（都合作各 3、被背叛 0、都背叛各 1），"
          "跳过不影响任何结果，也不会记进你的成绩。"),
+        ("学习目标",
+         "把支付矩阵读成条件句——「若它合作我拿几分、若它背叛我拿几分」，"
+         "并练一次在对手身份未知时按行为下注。"),
     ],
     "play": [
         ("这一排在说什么",
@@ -1561,9 +1855,16 @@ GAME_HELP = {
          "浅米色还没开。右边那个数是跨局总得分。"),
         ("本轮第 N / M 轮",
          "本局的进度。分数只在每一轮双方都出完之后才结算，所以本轮的分还没算进去。"),
+        ("按钮下面那两个数",
+         "每个按钮下面写着两种情形各拿几分：「若对手合作 +3」「若对手背叛 +0」。"
+         "高亮的那一条是它上一轮刚做过的那件事——所以按钮上的数字不是承诺，"
+         "是一个条件句，赌的是它下一轮接着这么干。"),
         ("为什么不告诉你对手是谁",
          "正式局里对手身份要等这一局打完才揭晓。你先看到的只有它上一轮做了什么——"
          "按行为决策，别按名字决策。"),
+        ("学习目标",
+         "在信息不完整的前提下做决策，并在事后把行为对回规则：本局的对手身份"
+         "打完才揭晓，揭晓后它会指出自己是在哪几轮按规则行动的。"),
     ],
     "results": [
         ("这张矩阵怎么读",
@@ -1575,6 +1876,9 @@ GAME_HELP = {
         ("上面三个数",
          "总局分是你全部局的总分；每局平均旁边那个差值，是它与「策略平均」的差距；"
          "策略平均是这些策略两两对局后的平均总分，只当参照线用。"),
+        ("学习目标",
+         "把自己的分数放进参照系里读：赢了几局是感受，与策略平均的差距才是"
+         "位置。参照线不是标准答案，它只是这批策略彼此对局的平均水平。"),
     ],
     "average": [
         ("两列的差别",
@@ -1585,6 +1889,9 @@ GAME_HELP = {
          "不是你的打法有问题。反过来也一样。"),
         ("背叛倾向",
          "它在全部对局里出背叛的比例，与它对你做了什么无关，是它整体的风格。"),
+        ("学习目标",
+         "同一策略在不同情境里的价值可以相反。判断一个打法好不好，先问它"
+         "面对的是谁——这正是下面「逐局记录」和「行为分析」要分开看的原因。"),
     ],
     "matches": [
         ("蓝点橙点",
@@ -1594,7 +1901,11 @@ GAME_HELP = {
          "得分那格里粗体是你的分，灰色是对手的分；「互相合作轮数」是双方都出合作"
          "的轮数，也就是各拿 3 分的那些轮。"),
         ("想看逐轮明细",
-         "上面「已完成的局」里点开每一局，有逐轮的选择与得分。"),
+         "逐轮表在每一局结束的那一刻就出现在屏幕上；这一屏只给形状。"
+         "具体轮次还会在「行为分析」每一项的证据里被点名。"),
+        ("学习目标",
+         "从十行的形状里读出自己的转折点：哪一轮你开始还手、哪一轮开始收手，"
+         "比记住任何一局的胜负更重要。"),
     ],
     "profile": [
         ("这些数字是什么",
@@ -1606,6 +1917,9 @@ GAME_HELP = {
         ("想看得更准怎么办",
          "单次 100 步够看出倾向，不够看出稳定。要比稳定性，就换种子多打几局，"
          "或者把轮数调长。"),
+        ("学习目标",
+         "读一个测量报告该有的样子：先看它凭什么数字算出来，再看它自己写的"
+         "「何种观察可推翻」。做不到这两步，就不算读懂了它。"),
     ],
     "dimensions": [
         ("先看哪一层",
@@ -1618,6 +1932,102 @@ GAME_HELP = {
         ("依据在哪",
          "每张卡片标题旁的 ⓘ 里写着该维度的定义、方向和实际测量口径，"
          "数字怎么来的都在那儿。"),
+        ("学习目标",
+         "九个方向不同的指标放在同一刻度上时，比较的是「位置」不是「好坏」。"
+         "真正的判断要回到你在哪几轮做了什么。"),
+    ],
+    "payoff": [
+        ("这三行数字是什么",
+         "一轮里只会发生三种结果：双方都合作，各拿 3 分；一方背叛，背叛的一方拿 5 分、"
+         "另一方 0 分；双方都背叛，各拿 1 分。蓝点代表合作，橙点代表背叛。"),
+        ("为什么每一轮背叛都更划算",
+         "对手合作时，背叛比合作多得 2 分（5 而不是 3）；对手背叛时，背叛比合作少亏 1 分"
+         "（1 而不是 0）。只看一轮的话，背叛在任何情形下都不比合作差——这不是设计失误，"
+         "这正是囚徒困境的定义。"),
+        ("那为什么还有人一直合作",
+         "因为一局不止一轮：对手会根据你上一轮做了什么来调整它下一轮的动作。这一轮少拿的"
+         "2 分，如果换来它此后连续几轮都合作，总分反而更高。谁在什么条件下划得来，"
+         "就是这个网站要测的东西。"),
+        ("学习目标",
+         "把这三行读成条件句而不是三个数字：先说出「若它这轮合作我拿几分、若它背叛我拿几"
+         "分」，再决定自己出什么。说不出条件句的时候，先别急着点按钮。"),
+    ],
+    "prediction": [
+        ("这一屏在说什么",
+         "开了「每轮先猜对手出什么」之后，每一轮你先选一次「它这轮出合作还是背叛」，"
+         "再决定你自己出什么。这里只算猜中的比例，与你得几分、你出的是哪一手都无关。"),
+        ("为什么要单独量这一项",
+         "打得好和看得准是两件事。有人一路背叛也能拿高分，因为对手恰好不还手；"
+         "有人把对手猜得很准，却仍然选择背叛。把猜测单独记下来，才知道自己缺的是判断"
+         "还是决断。"),
+        ("猜不准说明什么",
+         "只说明一件事：那个对手的行为里有你还没识别出来的规则，或者它本身带噪声"
+         "（带神经质、心狠、失忆这类修正槽的策略，行为里真的有随机数）。两者都不说明"
+         "别的什么，也不是能力评价。"),
+        ("和九项维度的关系",
+         "九项维度量的是你做了什么；这一屏量的是你以为对手会做什么。一个是行为测量，"
+         "一个是心智模型的准确度，刻意不合并。"),
+        ("学习目标",
+         "把你对对手的判断写成可以被推翻的预测——每一轮它就是一次检验。猜错的那些轮，"
+         "去「已完成的局」里回看它当时按哪条规则出牌，比记住自己的错误更有用。"),
+    ],
+    "record": [
+        ("「另一手」那一列在说什么",
+         "同一局面下，如果你出的是另一手，本轮能拿几分、比这一手多还是少。"
+         "它是引擎当场结算的分支，不是事后补的说法。"),
+        ("「若改选，它下轮出 X」",
+         "引擎把对手这一轮出牌前的状态复制一份，先让它把这轮的牌出完，再问它"
+         "下一轮怎么回答你没出的那一手。只有两条分支的答案不一样时才写这一行。"),
+        ("为什么要分开看",
+         "当场少拿 2 分却让对手下一轮转回合作，和当场少拿 2 分却什么都没换来，"
+         "是两个完全不同的决定。这张表把它们分开。"),
+        ("学习目标",
+         "用一个决定在另一条分支上的代价来衡量它：把「我选错了」换成"
+         "「我为了什么放弃了什么」。"),
+    ],
+    "rank": [
+        ("这一屏是给谁的",
+         "只在打了老师下发的挑战时出现。同一份题面（同一串对手、同一个轮数、同一份种子）"
+         "下的提交才放在一起排，排的是选择，不是运气。"),
+        ("看得到别人什么",
+         "只有总分和一个随机加入码。看不到别人的姓名、九项测量或任何一局的决策。"),
+        ("名次为什么会有并列",
+         "同分算同一名次，下一名跳号。两个班用同一套打法打出同一个分，就该读成并列。"),
+        ("下面那几行参照线",
+         "永远合作、永远背叛、以牙还牙这些标准策略在这套题面上的总分。它们不是答案，"
+         "是对照：同一套对手里，换一种打法能拿多少分。"),
+        ("学习目标",
+         "先找到自己的名次与中位分的差距，再去参照线里找打得更高的那一行，"
+         "然后说出它和你差在哪一条规则上——而不是「我这次运气不好」。"),
+    ],
+    "task": [
+        ("这一屏和平时有什么不同",
+         "题面是老师锁定的：对手编码、每局轮数、种子都不再可调。全班打的是同一套题，"
+         "所以成绩可以放在一起排。"),
+        ("为什么不能自己调",
+         "对手集合一定，分数才有共同的分母。换一套对手就是换一道题，把两次的分放在"
+         "一张榜上排，排的是运气而不是选择。"),
+        ("打完会多出什么",
+         "成绩页会多一块「这张挑战卷」：你在这批提交里的名次、这批提交的中位数与"
+         "四分位，以及几个标准策略在同一套对手上拿到的分。"),
+        ("学习目标",
+         "把自己的分放进同一套题的参照系里看——既与同学比，也与标准策略比。"),
+    ],
+    "rank": [
+        ("名次是怎么算的",
+         "只统计这份挑战码下的提交。每一份都由存下来的决策重放算分——引擎是"
+         "确定性的，所以榜单和你当时屏幕上看到的总分必然一致。没打完的不计入。"),
+        ("为什么有并列",
+         "同分共享一个名次，下一个名次要跳过。这批人做的是同样的选择，硬排先后"
+         "只是在制造噪音。"),
+        ("标准策略那一栏",
+         "它们是同一套对手、同一份种子下的自动对局，不是给你的答案。看的是"
+         "「第一名换人」这件事：同一套打法换一批对手，可能从最好变成最差。"),
+        ("这张榜里有什么、没有什么",
+         "只有随机加入码和分数——没有姓名，也没有任何能指认到人的东西。"
+         "码与人对上，是老师在自己那份纸面上做的事。"),
+        ("学习目标",
+         "读一张有条件的榜：先问「这套题里第一是谁」，再问「换一套题他还第一吗」。"),
     ],
 }
 
@@ -1656,8 +2066,28 @@ def _played_actions() -> list[str]:
     return acts
 
 
+def _played_predictions() -> list[str]:
+    """玩家每一轮的猜测，每局一段，与 :func:`_played_actions` 逐位对齐。
+
+    没猜的那些轮记成 ``-``，而不是干脆跳过——否则第 3 局的一次猜测会落进第 2 局
+    的位置上。整段为空表示这一局根本没开预测。
+    """
+    def pad(turns: int, given: str) -> str:
+        return (given + "-" * turns)[:turns]
+
+    preds = [
+        pad(len(match.player_actions), match.predictions)
+        for match in (st.session_state.get(GAME_MATCHES_KEY) or [])
+    ]
+    runner = st.session_state.get(GAME_RUNNER_KEY)
+    if runner is not None:
+        played = "".join(decision.action for decision in runner.decisions)
+        preds.append(pad(len(played), "".join(runner.prediction_history)))
+    return preds
+
+
 def _game_payload() -> str | None:
-    """把整局编码成 ``v1.对手数.轮数.种子.各局决策``。
+    """把整局编码成 ``v1.对手数.轮数.种子.各局决策``；挑战局是 ``v2.各局决策``。
 
     种子决定对手组合，引擎又是确定性的——实测同种子 + 同决策重放，对手行为、
     双方得分、profile 全部一致。所以只需要存**玩家自己的决策**：URL 长度控制在
@@ -1667,6 +2097,11 @@ def _game_payload() -> str | None:
     codes = st.session_state.get(GAME_CODES_KEY)
     if not setup or not codes:
         return None
+    challenge = st.session_state.get(GAME_TASK_KEY)
+    if challenge:
+        # 题面在挑战那一行里，URL 只需要说"打到第几步"。把 count/turns/seed 再抄
+        # 一遍就会出现地址栏和题面不一致的那类 bug。
+        return ".".join([_PAYLOAD_VERSION_TASK] + _played_actions())
     return ".".join(
         [_PAYLOAD_VERSION, str(setup["count"]), str(setup["turns"]), str(setup["seed"])]
         + _played_actions()
@@ -1674,14 +2109,23 @@ def _game_payload() -> str | None:
 
 
 def _replay_run(count: int, turns: int, seed: int, acts: list[str], *,
-                join_code: str | None = None) -> None:
+                join_code: str | None = None,
+                challenge: dict | None = None,
+                predictions: list[str] | None = None) -> None:
     """从"设置 + 玩家决策"重放出一局，填好 session_state。
 
     地址栏恢复和加入码恢复共用它：确定性的引擎意味着只要喂回同样的种子和同样
     的决策，重放出来的对手、比分与九项测量必然和原局一致——所以存的从来不是
     报告，而是产生报告的那几步选择。
+
+    ``challenge`` 是挑战局的情形：对手集合由挑战给定（不再是种子的函数），所以
+    载荷里只留决策。计数以挑战为准，避免"题面 6 个对手、榜上按 10 个算"。
     """
-    codes = draw_opponents(count, seed)
+    if challenge is not None:
+        codes = list(challenge["codes"])
+        count, turns, seed = len(codes), challenge["turns"], challenge["seed"]
+    else:
+        codes = draw_opponents(count, seed)
     matches: list = []
     done: list = []
     runner = None
@@ -1689,9 +2133,16 @@ def _replay_run(count: int, turns: int, seed: int, acts: list[str], *,
         match_runner = PlayerMatchRunner(
             index=index, opponent=code, turns=turns, seed=seed + 1 + index
         )
-        for action in (acts[index] if index < len(acts) else ""):
+        given = predictions[index] if predictions and index < len(predictions) else ""
+        # ``play`` reads the pending guess and clears it, so restoring means
+        # re-offering each turn's guess one step ahead of the action it belonged
+        # to. A "-" (or a missing character) is simply "this turn was not guessed".
+        for step, action in enumerate(acts[index] if index < len(acts) else ""):
             if match_runner.finished:
                 break
+            guess = given[step] if step < len(given) else "-"
+            match_runner.set_prediction(
+                guess if guess in ("C", "D") else None)
             match_runner.play(action)
         if match_runner.finished:
             finished = match_runner.finish()
@@ -1702,7 +2153,13 @@ def _replay_run(count: int, turns: int, seed: int, acts: list[str], *,
             runner = match_runner
             break
 
-    st.session_state[GAME_SETUP_KEY] = {"count": count, "turns": turns, "seed": seed}
+    st.session_state[GAME_SETUP_KEY] = {
+        "count": count, "turns": turns, "seed": seed,
+        # 猜牌那一屏要不要出来，跟着"这一局有没有留下猜测"走：库里那段串存在，
+        # 说明学生开过这个开关，刷新之后不该莫名其妙关掉它。
+        "predict": bool(predictions),
+    }
+    st.session_state[GAME_TASK_KEY] = challenge
     st.session_state[GAME_CODES_KEY] = codes
     st.session_state[GAME_MATCHES_KEY] = matches
     st.session_state[GAME_DONE_KEY] = done
@@ -1720,6 +2177,63 @@ def _replay_run(count: int, turns: int, seed: int, acts: list[str], *,
         st.session_state["game_phase"] = "play"
 
 
+def _resolve_challenge(task_id: str) -> dict | None:
+    """挑战码 → 题面。先认代码里预置的那几张，再查老师自建的表。
+
+    预置不入库，改预设就不必迁移数据；自建挑战只有一套编码和几个数字，里面没有
+    任何能指认到人的东西。
+    """
+    code = store.normalize_code(task_id or "")
+    if not code:
+        return None
+    preset = challenges.preset(code)
+    if preset is not None:
+        return preset
+    try:
+        return store.load_challenge(code)
+    except (sqlite3.Error, OSError) as error:
+        st.session_state[STORE_ERROR_KEY] = str(error)
+        return None
+
+
+def _ensure_join_row(join_code: str | None, *, count: int, turns: int,
+                     seed: int, challenge_id: str = "") -> str | None:
+    """地址栏里的加入码可能已经不在库里（免费版每次重新部署都清空文件）。
+
+    这串码是那一局唯一的凭据，所以按 URL 自带的题面重新登记，之后的进度才有人
+    接着收。登记失败就放弃这一路的持久化，但绝不打断重放——学生至少能把这局打完。
+    """
+    if not join_code:
+        return None
+    try:
+        if store.load_run(join_code) is None:
+            store.create_run(
+                join_code, class_code="", opponent_count=count, turns=turns,
+                seed=seed, engine_version=ENGINE_VERSION, tutorial_done=True,
+                challenge_id=challenge_id,
+            )
+    except (sqlite3.Error, OSError) as error:
+        st.session_state[STORE_ERROR_KEY] = str(error)
+        return None
+    return join_code
+
+
+def _stored_predictions(join_code: str | None) -> list[str] | None:
+    """地址栏恢复时，从名单库里补回这一局已经猜过的那些轮。
+
+    ``?g=`` 里只有决策，没有猜测：那是刻意不动载荷格式，而不是漏了。所以刷新之后
+    猜测还在不在，取决于加入码能不能在库里查到——查得到就照常回填，查不到也只是
+    少了这一次练习，对局本身与比分不受影响。
+    """
+    if not join_code:
+        return None
+    try:
+        run = store.load_run(join_code)
+    except (sqlite3.Error, OSError):
+        return None
+    return run["predictions"] if run else None
+
+
 def _restore_game_from_url() -> None:
     """把地址栏里带着的一局重放出来。
 
@@ -1733,7 +2247,32 @@ def _restore_game_from_url() -> None:
         return
 
     parts = payload.split(".")
-    if len(parts) < 4 or parts[0] != _PAYLOAD_VERSION:
+    version = parts[0]
+
+    if version == _PAYLOAD_VERSION_TASK:
+        challenge = _resolve_challenge(_query_value(GAME_TASK_PARAM) or "")
+        if challenge is None:
+            # 挑战被删掉了：这一局的题面无从恢复，宁可回到设置页，也不把学生的
+            # 决策重放到另一套对手上——那份报告看起来完全正常，却答的是别的题。
+            st.error(
+                "地址栏里的挑战码「{}」在这里查不到了，这一局没法接着打。"
+                "请向老师要一份新的链接。".format(
+                    _query_value(GAME_TASK_PARAM) or "（空）")
+            )
+            _clear_persisted_game()
+            return
+        join_code = _ensure_join_row(
+            _query_value(GAME_JOIN_PARAM),
+            count=len(challenge["codes"]), turns=challenge["turns"],
+            seed=challenge["seed"],
+            challenge_id=challenge["challenge_id"],
+        )
+        _replay_run(0, challenge["turns"], challenge["seed"], parts[1:],
+                    join_code=join_code, challenge=challenge,
+                    predictions=_stored_predictions(join_code))
+        return
+
+    if len(parts) < 4 or version != _PAYLOAD_VERSION:
         _clear_persisted_game()
         return
     try:
@@ -1742,21 +2281,12 @@ def _restore_game_from_url() -> None:
         _clear_persisted_game()
         return
 
-    # 地址栏里的码可能已经不在库里了——免费版每次重新部署都会清空文件。这串码此
-    # 时是那一局唯一的凭据，按 URL 自带的设置重新登记，之后的进度才有人接着收。
-    join_code = _query_value(GAME_JOIN_PARAM)
-    if join_code:
-        try:
-            if store.load_run(join_code) is None:
-                store.create_run(
-                    join_code, class_code="", opponent_count=count, turns=turns,
-                    seed=seed, engine_version=ENGINE_VERSION, tutorial_done=True,
-                )
-        except (sqlite3.Error, OSError) as error:
-            st.session_state[STORE_ERROR_KEY] = str(error)
-            join_code = None
-
-    _replay_run(count, turns, seed, parts[4:], join_code=join_code)
+    join_code = _ensure_join_row(
+        _query_value(GAME_JOIN_PARAM),
+        count=count, turns=turns, seed=seed,
+    )
+    _replay_run(count, turns, seed, parts[4:], join_code=join_code,
+                predictions=_stored_predictions(join_code))
 
 
 def _persist_store() -> None:
@@ -1775,6 +2305,7 @@ def _persist_store() -> None:
         store.save_progress(
             code,
             actions=_played_actions(),
+            predictions=_played_predictions(),
             tutorial_done=bool(st.session_state.get(GAME_TUTORIAL_DONE)),
             status="finished" if len(matches) >= len(codes) else "playing",
         )
@@ -1803,24 +2334,40 @@ def _persist_game() -> None:
     code = st.session_state.get(GAME_JOIN_KEY)
     if code and _query_value(GAME_JOIN_PARAM) != code:
         st.query_params[GAME_JOIN_PARAM] = code
+    # 挑战码也要一起走：v2 载荷只带决策，没有 task 参数就没人知道这套决策是
+    # 在答哪道题。反过来，自由局要把它删干净，免得残留的 task 把 v1 载荷
+    # 错认成挑战局。
+    task = (st.session_state.get(GAME_TASK_KEY) or {}).get("challenge_id", "")
+    if task:
+        if _query_value(GAME_TASK_PARAM) != task:
+            st.query_params[GAME_TASK_PARAM] = task
+    elif GAME_TASK_PARAM in st.query_params:
+        del st.query_params[GAME_TASK_PARAM]
 
 
 def _clear_persisted_game() -> None:
-    for param in (GAME_PARAM, GAME_JOIN_PARAM):
+    for param in (GAME_PARAM, GAME_JOIN_PARAM, GAME_TASK_PARAM):
         if param in st.query_params:
             del st.query_params[param]
 
 
-def _game_start(count: int, turns: int, seed: int, class_code: str = "") -> None:
+def _game_start(count: int, turns: int, seed: int, class_code: str = "",
+                codes: list[str] | None = None,
+                challenge: dict | None = None) -> None:
     """Deal opponents, prime the first match, and register the run in the store.
 
     The join code is allocated here rather than at the first decision because a
     student who opens the page and gets diverted still has something to come
     back with -- and because the code is the only handle they ever get on their
     own data.
+
+    ``codes`` / ``challenge`` 是挑战局的情形：对手集合来自题面而不是种子，而
+    challenge_id 是这张榜的分组键——只有同一挑战码下的提交才会被放在一起排。
     """
-    codes = draw_opponents(count, seed)
+    if codes is None:
+        codes = draw_opponents(count, seed)
     st.session_state[GAME_CODES_KEY] = codes
+    st.session_state[GAME_TASK_KEY] = challenge
     st.session_state[GAME_MATCHES_KEY] = []
     st.session_state[GAME_DONE_KEY] = []
     st.session_state[GAME_RESULTS_KEY] = None
@@ -1834,9 +2381,10 @@ def _game_start(count: int, turns: int, seed: int, class_code: str = "") -> None
     try:
         join_code = store.new_join_code()
         store.create_run(
-            join_code, class_code=class_code, opponent_count=count, turns=turns,
-            seed=seed, engine_version=ENGINE_VERSION,
+            join_code, class_code=class_code, opponent_count=len(codes),
+            turns=turns, seed=seed, engine_version=ENGINE_VERSION,
             tutorial_done=bool(st.session_state.get(GAME_TUTORIAL_DONE)),
+            challenge_id=(challenge or {}).get("challenge_id", ""),
         )
         st.session_state[GAME_JOIN_KEY] = join_code
     except (sqlite3.Error, OSError, RuntimeError) as error:
@@ -1886,7 +2434,98 @@ def _game_finish(placeholder=None) -> None:
     st.session_state[GAME_PROFILE_KEY] = build_profile(matches)
 
 
+def _challenge_card(challenge: dict, *, issued: bool = False) -> str:
+    """题面卡：这套题有多少步、是什么生态，但不含编码。
+
+    对手编码刻意不列出来——正式局里身份要等一局打完才揭晓，把清单印在开局前
+    等于把答案写在卷子上。简介（``blurb`` / ``note``）说的是这一类对手的行为
+    倾向，那正是老师想让学生带着进对局的东西。
+    """
+    steps = challenges.steps(challenge)
+    minutes = steps * 5 / 60
+    return (
+        "<div class='tf-ident'>"
+        "<div class='tf-ident__head'>"
+        "<span class='tf-ident__kicker'>挑战</span>"
+        "<b class='tf-ident__name'>{title}</b>"
+        "<span class='tf-ident__label'>{code}</span>"
+        "</div>"
+        "<div class='tf-rule'><div class='tf-rule__body'>"
+        "<b>{n} 局 × 每局 {t} 轮 = {s} 步</b><span>约 {m:.0f} 分钟。"
+        "题面已锁定：对手集合、轮数与种子都由这份挑战给定，"
+        "所以同一次课的每一份提交算的是同一道题。</span>"
+        "</div></div>"
+        "<div class='tf-rule'><div class='tf-rule__body'>"
+        "<b>这一套对手</b><span>{blurb}</span></div></div>"
+        "<div class='tf-ident__note'>{foot}</div>"
+        "</div>"
+    ).format(
+        title=challenge["title"],
+        code=challenge["challenge_id"],
+        n=len(challenge["codes"]), t=challenge["turns"], s=steps, m=minutes,
+        blurb=challenge.get("blurb") or challenge.get("note")
+        or "老师没有写简介。",
+        foot=(
+            "对手的编码仍然要一局打完才揭晓。" if not issued
+            else "把这段链接发给全班，点开就已经选好题面。"
+        ),
+    )
+
+
+def _predict_toggle() -> bool:
+    """The optional "guess first" exercise, offered before the run starts.
+
+    Deliberately a toggle rather than a forced step: guessing is a second object
+    of measurement (how well you model the other side) and it must never gate the
+    first one (what you actually play). It is off by default so a student who has
+    never seen the game gets the plain decision screen.
+    """
+    return bool(st.toggle(
+        "每轮先猜对手出什么",
+        key=PREDICT_KEY,
+        help="开了之后，每一轮在两个按钮上面多一行：先选你猜它出合作还是背叛，"
+             "再决定你自己出什么。猜不猜都不影响比分——引擎只看你出的那一手，"
+             "猜测只用来在成绩页算「预测命中率」。",
+    ))
+
+
+def _start_challenge(challenge: dict, class_code: str) -> None:
+    st.session_state[GAME_SETUP_KEY] = {
+        "count": len(challenge["codes"]),
+        "turns": challenge["turns"],
+        "seed": challenge["seed"],
+        "predict": bool(st.session_state.get(PREDICT_KEY)),
+    }
+    _game_start(
+        len(challenge["codes"]), challenge["turns"], challenge["seed"],
+        class_code, codes=list(challenge["codes"]), challenge=challenge,
+    )
+
+
+def _render_challenge_setup(challenge: dict) -> None:
+    """锁题的那一屏：没有滑块，只有题面、班级码和一个开始键。"""
+    st.markdown(
+        theme.heading("第一步：这套题已经锁好了", 3, help_blocks=GAME_HELP["task"]),
+        unsafe_allow_html=True,
+    )
+    st.markdown(_challenge_card(challenge), unsafe_allow_html=True)
+    st.text_input(
+        "班级码（可留空）",
+        placeholder=challenge.get("class_code") or "例如 计科231",
+        help="只用于把同一批人的对局归到一起；榜单按挑战码分组，班级码是可选的第二层筛选。",
+        key=CLASS_CODE_KEY,
+    )
+    _predict_toggle()
+    if st.button("开始这一局挑战", type="primary", width="stretch"):
+        _start_challenge(challenge, (st.session_state.get(CLASS_CODE_KEY) or "").strip()[:24])
+        st.rerun()
+
+
 def _render_game_setup() -> None:
+    challenge = st.session_state.get(GAME_TASK_KEY)
+    if challenge:
+        _render_challenge_setup(challenge)
+        return
     st.markdown(
         theme.heading("第一步：设置这一局", 3, help_blocks=GAME_HELP["setup"]),
         unsafe_allow_html=True,
@@ -1909,7 +2548,12 @@ def _render_game_setup() -> None:
             steps, count, turns, steps * 5 / 60)
     )
     # The stakes, at the moment they commit to them.
-    st.markdown(theme.payoff_chips(), unsafe_allow_html=True)
+    st.markdown(
+        theme.payoff_chips(help_html=theme.help_chip(
+            GAME_HELP["payoff"], label="这些数字怎么读",
+        )),
+        unsafe_allow_html=True,
+    )
 
     # 老师自己起的分组标签，用来把同一次课的名单聚到一起。它不是学生名册：这张
     # 表里没有、也不该有姓名之类能指认到人的东西。
@@ -1919,6 +2563,7 @@ def _render_game_setup() -> None:
         help="只用于把同一批人的对局归到一起，教师端看板按它筛选。不填也能玩。",
         key=CLASS_CODE_KEY,
     )
+    predict = _predict_toggle()
 
     if st.button("开始这一局", type="primary", width="stretch"):
         try:
@@ -1926,9 +2571,35 @@ def _render_game_setup() -> None:
         except ValueError:
             st.error("种子必须是整数")
             return
-        st.session_state[GAME_SETUP_KEY] = {"count": count, "turns": turns, "seed": seed}
+        st.session_state[GAME_SETUP_KEY] = {
+            "count": count, "turns": turns, "seed": seed, "predict": predict,
+        }
         _game_start(count, turns, seed, class_code.strip()[:24])
         st.rerun()
+
+    # 挑战码收在滑块下面：绝大多数人是来自由打一局的，那三行选择是他们要做的决定；
+    # 而被下发了码的人只需要输一次码。
+    with st.expander("老师下发了挑战码？", expanded=False):
+        st.caption(
+            "输入挑战码，题面（对手集合、每局轮数、种子）就替你锁定；这一局的"
+            "成绩才会和同批提交排在同一张榜上。码显示在老师那份页面上。")
+        task_col, btn_col = st.columns([3, 1], vertical_alignment="bottom")
+        with task_col:
+            task_input = st.text_input(
+                "挑战码", placeholder="例如 P-R1EC", key=TASK_CODE_KEY,
+                label_visibility="collapsed",
+            )
+        with btn_col:
+            if st.button("进入挑战", key="enter_task", width="stretch"):
+                resolved = _resolve_challenge(task_input or "")
+                if resolved is None:
+                    st.error(
+                        "查不到挑战码「{}」。核对有没有抄错——I、O、0、1 这四个"
+                        "字符不会出现在挑战码里。".format(
+                            store.normalize_code(task_input or "") or "（空）"))
+                else:
+                    st.session_state[GAME_TASK_KEY] = resolved
+                    st.rerun()
 
 
 def _render_resume_box() -> None:
@@ -1966,11 +2637,69 @@ def _render_resume_box() -> None:
                     run["engine_version"], ENGINE_VERSION)
             )
             return
+        challenge = None
+        if run["challenge_id"]:
+            challenge = _resolve_challenge(run["challenge_id"])
+            if challenge is None:
+                # 和版本不一致那一路同样的道理：把决策重放到另一套对手上，会得到
+                # 一份看起来完全正常、却答错了题的报告。
+                st.error(
+                    "这一局挂的挑战「{}」在这里查不到了（可能已被删除或这个实例"
+                    "还没导入挑战表）。不做重放——向老师要一份新的链接吧。".format(
+                        run["challenge_id"])
+                )
+                return
         _replay_run(
             run["count"], run["turns"], run["seed"], run["actions"],
-            join_code=run["join_code"],
+            join_code=run["join_code"], challenge=challenge,
+            predictions=run.get("predictions"),
         )
         st.rerun()
+
+
+def _lock_challenge_from_url() -> None:
+    """老师下发的链接：``?task=P-R1EC`` 点开就已经锁好题面，学生不必自己输码。
+
+    只在没有正在恢复的局时生效——带着 ``?g=`` 的链接里已经有题面了，两处都读就会
+    出现地址栏和题面不一致。挑战码查不到时说明题面丢了，宁可回到自由局设置页，
+    也不要把学生引到另一套对手上去。
+    """
+    if (st.session_state.get(GAME_SETUP_KEY)
+            or st.session_state.get(GAME_TASK_KEY)
+            or _query_value(GAME_PARAM)):
+        return
+    task = _query_value(GAME_TASK_PARAM)
+    if not task:
+        return
+    challenge = _resolve_challenge(task)
+    if challenge is None:
+        st.error(
+            "链接里的挑战码「{}」在这里查不到（可能这份题面还没导入这个实例）。"
+            "先按普通一局打，或向老师要一份新的链接。".format(task))
+        return
+    st.session_state[GAME_TASK_KEY] = challenge
+    st.session_state["app_mode"] = MODE_GAME
+
+
+def _prediction_line(runner: PlayerMatchRunner, decision) -> None:
+    """上一轮那一次猜测的回显，就地写在下一轮的猜测栏上面。
+
+    读的是 ``runner.decisions``，不是 ``game_last``：每步决策后 ``_persist_game``
+    都要改写地址栏里的 ``?g=``，那会再触发一次重跑，而 ``game_last`` 在那次重跑里
+    已经被取走。只有从 runner 反读，这一行才真的留在屏幕上——否则学生点完就看不见
+    自己刚才猜中了没有。
+    """
+    guesses = sum(1 for mark in runner.prediction_history if mark in ("C", "D"))
+    hits = sum(
+        1 for item in runner.decisions
+        if item.prediction == item.opponent_action
+        and item.prediction in ("C", "D")
+    )
+    st.markdown(
+        prediction_note(decision.prediction, decision.opponent_action,
+                        guesses, hits),
+        unsafe_allow_html=True,
+    )
 
 
 def _render_game_play() -> None:
@@ -2012,6 +2741,23 @@ def _render_game_play() -> None:
             st.markdown(action_cue(last), unsafe_allow_html=True)
 
         _score_bar(runner, played)
+
+        # 先猜再选：猜的是对手的行为，选的是自己的立场，两件事分开做才量得出来。
+        # 猜测在点下合作/背叛的那一刻被 ``play`` 取走，所以这一行不需要任何提交动作。
+        if setup.get("predict"):
+            if runner.decisions:
+                _prediction_line(runner, runner.decisions[-1])
+            guessed = st.pills(
+                "你猜对手这一轮出什么",
+                ["合作", "背叛", "不猜"],
+                selection_mode="single",
+                default=["不猜"],
+                key="guess_{}_{}".format(runner.index, prompt["turn"]),
+                help="可跳过。猜与不猜都不影响这一轮的比分——引擎只看你出的那一手；"
+                     "猜中的那些轮会在成绩页单独算一个命中率。",
+            )
+            runner.set_prediction(
+                {"合作": "C", "背叛": "D"}.get(guessed))
 
         # The action buttons used to sit below the running history, so every extra
         # turn pushed them further down the page and the player had to scroll to
@@ -2063,14 +2809,23 @@ def _render_game_play() -> None:
         # Settlement: the reveal, the score and the full record, and only then
         # the button to move on. The live table below is skipped in this branch
         # -- rendering both produced two copies of the same record on one page.
-        _render_completed_match(prompt, runner)
+        finished = _render_completed_match(prompt, runner)
+        # 末轮那一次猜测在这里补上：这一支提前 return，走不到下面那段，而这一局
+        # 的命中率里确实算上了它。
+        if setup.get("predict"):
+            _prediction_line(runner, last)
         # The last settlement must not offer 下一局: the run has one screen left,
         # and a player who pressed the always-same label expected another opponent
         # and got a report instead.
         is_last = len(matches) + 1 >= len(codes)
-        reveal_col, next_col = st.columns([3, 2], vertical_alignment="bottom")
+        # [7, 3] rather than an even split: the card is the reading material of
+        # this screen, and the button beside it only ever says 下一局.
+        reveal_col, next_col = st.columns([7, 3], vertical_alignment="bottom")
         with reveal_col:
-            st.markdown(identity_card(prompt["opponent"]), unsafe_allow_html=True)
+            st.markdown(
+                identity_card(prompt["opponent"], finished),
+                unsafe_allow_html=True,
+            )
         with next_col:
             label = "查看成绩与行为分析" if is_last else "进入下一局"
             if st.button(label, type="primary", width="stretch"):
@@ -2085,7 +2840,7 @@ def _render_game_play() -> None:
         st.markdown(
             history_table(
                 runner.player_actions_view(), runner.opponent_actions_view(),
-                turns=played, highlight=played - 1,
+                turns=played, highlight=played - 1, decisions=runner.decisions,
             ),
             unsafe_allow_html=True,
         )
@@ -2142,15 +2897,14 @@ def _render_done_matches() -> None:
         st.markdown(
             history_table(
                 match.player_actions, match.opponent_actions,
-                turns=match.turns,
+                turns=match.turns, decisions=match.decisions,
             ),
             unsafe_allow_html=True,
         )
-        st.caption(
-            "对手编码 `{}`　你 {} 分，它 {} 分。".format(
-                match.opponent, int(match.player_score),
-                int(match.opponent_score))
-        )
+        # The same card the settlement screen shows: 回看 is where a student goes
+        # to work out why they lost, and the rule text is where the answer is.
+        st.markdown(
+            identity_card(match.opponent, match), unsafe_allow_html=True)
     st.markdown("### 已完成的局")
     head = (
         "<div style='overflow-x:auto;margin:0.2rem 0 0.6rem'>"
@@ -2184,7 +2938,8 @@ def _render_done_matches() -> None:
                 unsafe_allow_html=True)
 
     with st.expander("回看每一局的决策记录", expanded=False):
-        st.caption("展开任意一局，可以看双方每一轮选了什么、拿到多少分。")
+        st.caption("展开任意一局，可以看双方每一轮选了什么、拿到多少分、改选另一手本可拿多少，"
+                   "以及对手的规则是在哪几轮显形的。")
         for row in done:
             gap = row["你"] - row["对手分"]
             verdict = "领先" if gap > 0 else ("落后" if gap < 0 else "持平")
@@ -2196,19 +2951,91 @@ def _render_done_matches() -> None:
                 _replay_table(row)
 
 
-def _render_completed_match(prompt: dict, runner: PlayerMatchRunner) -> None:
-    """The match that just ended: its full per-turn record and the final score."""
+def _render_completed_match(prompt: dict, runner: PlayerMatchRunner) -> Match:
+    """The match that just ended: its full per-turn record and the final score.
+
+    Returns the finished :class:`Match` so the caller can hand it to the identity
+    card, which points at the turns where that opponent's rule showed up.
+    """
     finished = runner.finish()
     st.markdown("---")
-    st.markdown("### 本局记录")
+    st.markdown(
+        theme.heading(
+            "本局记录", 3, help_blocks=GAME_HELP["record"],
+            help_label="这张逐轮表怎么读",
+        ),
+        unsafe_allow_html=True,
+    )
     _score_bar(runner, len(runner.decisions))
     st.markdown(
         history_table(
             finished.player_actions, finished.opponent_actions,
             turns=finished.turns, highlight=finished.turns - 1,
+            decisions=finished.decisions,
         ),
         unsafe_allow_html=True,
     )
+    return finished
+
+
+def _render_class_rank() -> None:
+    """挑战局才有的一屏：你在这批提交里的位置，和标准策略在同一套题面上的分数。
+
+    只把同一 ``challenge_id`` 下的提交放在一起算，别人那一侧看到的也只是加入码与总分
+    ——没有姓名，也没有别的同学的九项测量。参照线在这里比名次更重要：它让学生看到
+    "最好的打法"取决于对面是谁，这正是这一课的主题。
+    """
+    challenge = st.session_state.get(GAME_TASK_KEY)
+    join_code = st.session_state.get(GAME_JOIN_KEY)
+    if not challenge or not join_code:
+        return
+    try:
+        peers = store.list_runs(challenge_id=challenge["challenge_id"])
+        board = challenges.ranking(challenge, peers, join_code=join_code)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        st.warning("这批提交的名次现在算不出来：{}".format(error))
+        return
+    if board["rank"] is None:
+        st.caption(
+            "这一局在这一屏没有排名：它要么还没打完，要么没有登记在名单库里"
+            "（地址栏恢复的局一定会带着加入码）。成绩与行为分析不受影响。")
+        return
+
+    st.markdown(
+        theme.heading("这批提交里的位置", 3, help_blocks=GAME_HELP["rank"]),
+        unsafe_allow_html=True,
+    )
+    rank_col, median_col, spread_col = st.columns(3)
+    rank_col.metric(
+        "你的名次", "{} / {}".format(board["rank"], board["count"]),
+        help="同一挑战码下已打完的 {} 份提交里的位置。同分并列，下一名跳号。".format(
+            board["count"]),
+    )
+    median_col.metric(
+        "这批的中位分", "{:g}".format(board["median"]),
+        help="这批提交总分的中位数。你的分在它上面还是下面，比名次更能说明位置。",
+    )
+    spread_col.metric(
+        "上四分位 / 下四分位",
+        "{:g} / {:g}".format(board["top_quartile"], board["first_quartile"]),
+        help="半数提交落在这两个数之间。区间很窄说明这套题面的结果对打法不敏感。",
+    )
+    st.dataframe(
+        [
+            {
+                "名次": "{}".format(line["above"] + 1),
+                "打法": "{}（{}）".format(line["label"], line["code"]),
+                "总分": "{:g}".format(line["score"]),
+                "它是怎么打的": line["note"],
+            }
+            for line in board["baselines"]
+        ],
+        width="stretch", hide_index=True,
+    )
+    st.caption(
+        "上面这几行是标准策略在同一串对手、同一个轮数、同一份种子下打出的总分——"
+        "不是标准答案，也不会有人来领这个分。看的是它们之间的差：同一套题面上，"
+        "换个打法能拿多少分。")
 
 
 def _render_game_results() -> None:
@@ -2258,9 +3085,78 @@ def _render_game_results() -> None:
     st.markdown(matches_overview(profile["matches"]), unsafe_allow_html=True)
 
     st.divider()
+    _render_class_rank()
+
+    st.divider()
     if st.button("查看行为分析", type="primary", width="stretch"):
         st.session_state["game_phase"] = "profile"
         st.rerun()
+
+
+def _prediction_stats(matches: list) -> dict | None:
+    """把每一局的猜测与对手实际出的那一手对齐，算出命中率。
+
+    只数真的猜过的那些轮：没猜的那些轮记成 ``-``，它们既不算猜对也不算猜错，否则
+    「跳过」会被读成「猜错」。这是本地逐轮比对，不是模型给出的判断。
+    """
+    rows = []
+    guesses = 0
+    hits = 0
+    for match in matches:
+        played = [
+            (decision.prediction, decision.opponent_action)
+            for decision in match.decisions
+            if decision.prediction in ("C", "D")
+        ]
+        if not played:
+            continue
+        hit = sum(1 for guess, actual in played if guess == actual)
+        guesses += len(played)
+        hits += hit
+        rows.append({
+            "局次": match.index + 1,
+            "对手": match.opponent_label,
+            "猜了": len(played),
+            "猜中": hit,
+            "命中率": "{:.0%}".format(hit / len(played)),
+        })
+    if not rows:
+        return None
+    return {"rows": rows, "guesses": guesses, "hits": hits}
+
+
+def _render_prediction_card(profile: dict) -> None:
+    """那一屏只有一件事：你猜对手的行为，猜得准不准。"""
+    stats = _prediction_stats(profile["matches"])
+    if stats is None:
+        return
+
+    st.markdown(
+        theme.heading(
+            "你猜得准吗", 3,
+            gloss="只在开了「每轮先猜对手出什么」时出现",
+            help_blocks=GAME_HELP["prediction"],
+        ),
+        unsafe_allow_html=True,
+    )
+    rate_col, count_col, best_col = st.columns(3)
+    rate_col.metric(
+        "预测命中率", "{:.0%}".format(stats["hits"] / max(stats["guesses"], 1)),
+        help="猜中的轮数 ÷ 猜过的轮数。只算真的猜过的那些轮；跳过的轮不进分母。",
+    )
+    count_col.metric(
+        "猜了 / 全部", "{} / {} 轮".format(
+            stats["guesses"], profile["total_turns"]),
+        help="剩下那些轮你直接出了牌，没有先猜。",
+    )
+    top = max(stats["rows"], key=lambda row: row["猜中"] / row["猜了"])
+    best_col.metric(
+        "猜得最准的一局", "第 {} 局".format(top["局次"]),
+        delta="{} {}".format(top["命中率"], top["对手"]),
+        delta_color="off",
+        help="对手标签是这一局那个策略的行为类别——猜得准往往意味着它的行为有规则可循。",
+    )
+    st.dataframe(stats["rows"], width="stretch", hide_index=True)
 
 
 def _render_game_profile() -> None:
@@ -2311,6 +3207,8 @@ def _render_game_profile() -> None:
              "它与「互相合作」「互相背叛」加起来就是全部 {} 轮。".format(
                  turns_played),
     )
+
+    _render_prediction_card(profile)
 
     # The score cards come first on purpose. A player should be able to read
     # where they stand before reading a single paragraph about why.
@@ -2996,6 +3894,8 @@ def main() -> None:
     # 地址栏里带着一局的话，先把它重放回 session_state，再决定渲染哪个模式。
     # 必须在读 ``app_mode`` 之前，否则会先落到模式选择页。
     _restore_game_from_url()
+    # 下发链接里的 ``?task=``：没有正在恢复的局时，它把题面锁好再进对局模式。
+    _lock_challenge_from_url()
 
     mode = st.session_state.get("app_mode")
     if mode is None:
