@@ -21,6 +21,8 @@ Three modes are offered in the sidebar:
 
 from __future__ import annotations
 
+from dashboard import theme
+
 # Below this width (CSS px) the auto mode switches to the phone treatment.
 MOBILE_BREAKPOINT = 860
 
@@ -103,27 +105,27 @@ div[role="dialog"] { max-width: 94vw !important; }
 
 def _pin_rules() -> str:
     """The pinned module must not hover over the page on a phone."""
-    return """
+    return f"""
 /* Pinned module: on a phone a sticky overlay hides the content it points at,
    so it collapses to a static block the user scrolls to deliberately. */
-.st-key-pinned_panel {
+.st-key-pinned_panel {{
     position: static !important;
     top: auto !important;
     max-height: none !important;
     overflow-y: visible !important;
     box-shadow: none !important;
-    border: 1px solid rgba(128,128,128,0.3) !important;
+    border: 1px solid {theme.EDGE} !important;
     border-radius: 0.5rem;
-}
+}}
 """
 
 
 def _detail_rules() -> str:
     """Turn the floating detail window into a dismissable bottom sheet."""
-    return """
+    return f"""
 /* Detail window: bottom sheet. Full width, anchored, scrollable, and it never
-   covers more than the lower third of the viewport. */
-.st-key-detail_float {
+   covers more than the lower half of the viewport. */
+.st-key-detail_float {{
     position: fixed !important;
     left: 0 !important; right: 0 !important; bottom: 0 !important;
     top: auto !important;
@@ -136,16 +138,16 @@ def _detail_rules() -> str:
     border-radius: 0.9rem 0.9rem 0 0 !important;
     border-left: none !important; border-right: none !important;
     border-bottom: none !important;
-    box-shadow: 0 -8px 26px rgba(0,0,0,0.24) !important;
+    box-shadow: {theme.SHADOW_SHEET} !important;
     padding: 0.7rem 0.9rem 1.2rem !important;
-}
-.st-key-detail_float::before {
+}}
+.st-key-detail_float::before {{
     content: "";
     display: block; width: 38px; height: 4px; margin: 0 auto 0.5rem;
-    border-radius: 2px; background: rgba(128,128,128,0.5);
-}
+    border-radius: 2px; background: {theme.GRIP};
+}}
 /* Leave room for the sheet so the last content row is never trapped. */
-.st-key-detail_float ~ * { padding-bottom: 0; }
+.st-key-detail_float ~ * {{ padding-bottom: 0; }}
 """
 
 

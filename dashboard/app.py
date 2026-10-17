@@ -158,7 +158,6 @@ from dashboard.visuals import (  # noqa: E402
 from dashboard.loading import (  # noqa: E402
     SPLASH_CSS,
     analysis_loading,
-    first_visit,
 )
 from dashboard.strategy_detail import parse_strategy_detail  # noqa: E402
 from dashboard.render_helpers import (  # noqa: E402
@@ -171,7 +170,8 @@ from dashboard.render_helpers import (  # noqa: E402
     build_matchup_heatmap,
     build_population_area,
     build_snapshot_html,
-    events_at,    _display_name,
+    events_at,
+    _display_name,
 )
 
 from dashboard.naming import build_name_map  # noqa: E402
@@ -225,16 +225,14 @@ def check_password() -> bool:
 
 def pin_css() -> str:
     """Make the keyed container stick to the top of the viewport."""
-    background = st.get_option("theme.backgroundColor")
-    if not background:
-        background = "#0e1117" if st.get_option("theme.base") == "dark" else "#ffffff"
+    background = st.get_option("theme.backgroundColor") or theme.GROUND
     return (
         "<style>"
         ".st-key-pinned_panel {"
         "position: sticky; top: 3.75rem; z-index: 1000;"
         "max-height: 82vh; overflow-y: auto;"
         f"background: {background};"
-        "box-shadow: 0 6px 18px rgba(0,0,0,0.12); border-radius: 0.5rem;"
+        f"box-shadow: {theme.SHADOW_PIN}; border-radius: 0.5rem;"
         "}"
         "</style>"
     )
@@ -309,11 +307,11 @@ def _render_saved_simulations() -> None:
     saved_list = list_saved_simulations()
     if not saved_list:
         st.divider()
-        st.markdown("**统一存档 / 加载**")
+        st.subheader("统一存档 / 加载")
         st.caption(f"暂无已保存的模拟。在「导出分析数据」中保存后，存档会写入 {RUNS_DIR}。")
         return
     st.divider()
-    st.markdown("**统一存档 / 加载**")
+    st.subheader("统一存档 / 加载")
     options = {}
     for item in saved_list:
         flag = " ⚠旧引擎" if item.get("stale_engine") else ""
@@ -347,7 +345,7 @@ def _render_saved_simulations() -> None:
             )
     load_col, delete_col = st.columns(2)
     with load_col:
-        if st.button("加载该存档", width="stretch"):
+        if st.button("加载该存档", width="stretch", type="primary"):
             loaded = load_simulation_from_file(selected_file)
             st.session_state["sim"] = loaded
             st.session_state["seed"] = chosen.get("seed") if chosen else None
@@ -387,7 +385,7 @@ def _render_share() -> None:
     carries everything needed to reproduce a run, so it *is* the share file.
     """
     st.divider()
-    st.markdown("**载入 / 复现**")
+    st.subheader("载入 / 复现")
     st.caption(
         "上传统一存档（archive/runs/*.tev.json）即可还原并继续演化；"
         "旧版分享摘要与面板存档仍可读取。"
@@ -542,7 +540,7 @@ def render_sidebar() -> dict | None:
             st.session_state["pin"] = PIN_OPTIONS[choice]
 
             st.divider()
-            st.markdown("**统一存档**")
+            st.subheader("统一存档")
             st.caption(
                 f"写入 archive/runs/　引擎 {ENGINE_VERSION}　格式 {RUN_SCHEMA_VERSION}"
             )
@@ -551,7 +549,7 @@ def render_sidebar() -> dict | None:
                 "存档名称（可留空自动命名）", placeholder=default_name, key="save_name_input"
             )
             save_note = st.text_input("备注（可选）", key="save_note_input")
-            if st.button("保存当前模拟", width="stretch"):
+            if st.button("保存当前模拟", width="stretch", type="primary"):
                 saved_meta = save_simulation(
                     simulation,
                     save_name.strip() or default_name,
@@ -567,11 +565,11 @@ def render_sidebar() -> dict | None:
                 )
 
             st.divider()
-            st.markdown("**策略库**")
+            st.subheader("策略库")
             live_codes = list({item.encoding for item in simulation.species})
             if live_codes:
                 pick_code = st.selectbox("选择要保存的策略", live_codes, key="save_strat_pick")
-                if st.button("保存到策略库", width="stretch"):
+                if st.button("保存到策略库", width="stretch", type="primary"):
                     if save_strategy(pick_code):
                         st.success(f"已保存：{pick_code}")
                     else:
@@ -925,17 +923,15 @@ def _detail_float_css() -> str:
     into a bottom sheet, so the inline rule must not fight it. Only the desktop
     layout gets the floating corner treatment.
     """
-    background = st.get_option("theme.backgroundColor")
-    if not background:
-        background = "#0e1117" if st.get_option("theme.base") == "dark" else "#ffffff"
+    background = st.get_option("theme.backgroundColor") or theme.GROUND
     return (
         "<style>"
         ".st-key-detail_float {"
         "position: fixed; right: 1rem; bottom: 1rem; width: min(380px, 92vw);"
         "max-height: 72vh; overflow-y: auto; z-index: 100000;"
         f"background: {background};"
-        "border: 1px solid rgba(128,128,128,0.35); border-radius: 0.6rem;"
-        "box-shadow: 0 8px 28px rgba(0,0,0,0.18); padding: 0.5rem 0.8rem;"
+        f"border: 1px solid {theme.EDGE}; border-radius: 0.6rem;"
+        f"box-shadow: {theme.SHADOW_FLOAT}; padding: 0.5rem 0.8rem;"
         "}"
         "</style>"
     )
@@ -1031,10 +1027,10 @@ def render_events(
     for event in events:
         st.markdown(
             f"<div style='padding:5px 10px;margin:3px 0;border-left:4px solid "
-            f"{event['color']};background:#fafafa;font-size:13px;'>"
+            f"{event['color']};background:{theme.RAISED};font-size:13px;'>"
             f"<b style='color:{event['color']}'>{event['事件']}</b>　"
             f"{event['编码']}　"
-            f"<span style='color:#888;'>父代 {event['父代']}</span></div>",
+            f"<span style='color:{theme.MUTED};'>父代 {event['父代']}</span></div>",
             unsafe_allow_html=True,
         )
 
@@ -1192,7 +1188,7 @@ def render_main() -> None:
             "标注框可拖动，拖动后箭头仍指向对应位置。"
         )
         area = build_population_area(simulation, names)
-        area.add_vline(x=view_gen, line_color="#333333", line_width=2)
+        area.add_vline(x=view_gen, line_color=theme.INK, line_width=2)
         # Dragging annotations needs the mode bar, which a phone has no room
         # for; keep the chart editable on desktop and read-only on mobile.
         area_config = {
@@ -1437,18 +1433,29 @@ def render_mode_select() -> None:
     st.markdown(theme.payoff_chips(), unsafe_allow_html=True)
 
     st.markdown('<div id="tf_about"></div>', unsafe_allow_html=True)
+    # Three collapsible blocks instead of three screens of prose. The heading
+    # stays on the page so a reader can see what is behind each click, and the
+    # body waits inside a ``<details>`` -- which opens without a server rerun,
+    # unlike an expander widget. 选择模式 below is deliberately *not* folded: it
+    # carries the two entry buttons, and hiding the way in to save scroll would
+    # be a bad trade.
     st.markdown(
-        theme.section("这个网站在做什么", "一句话：一个能让你亲手验证「合作划不划算」的模拟器"),
+        theme.fold(
+            "这个网站在做什么",
+            theme.prose_card(LANDING_WHY) + theme.architecture(LANDING_ARCH),
+            hint="不点也能直接开始",
+        ),
         unsafe_allow_html=True,
     )
-    st.markdown(theme.prose_card(LANDING_WHY), unsafe_allow_html=True)
-    st.markdown(theme.architecture(LANDING_ARCH), unsafe_allow_html=True)
 
     st.markdown(
-        theme.section("怎么玩", "第一次建议从游戏模式开始，全程约 8 分钟"),
+        theme.fold(
+            "怎么玩",
+            theme.steps(LANDING_STEPS),
+            hint="第一次建议从游戏模式开始，全程约 8 分钟",
+        ),
         unsafe_allow_html=True,
     )
-    st.markdown(theme.steps(LANDING_STEPS), unsafe_allow_html=True)
 
     st.markdown(
         theme.section("选择模式", "进入后可在侧栏随时切回"), unsafe_allow_html=True
@@ -1475,10 +1482,13 @@ def render_mode_select() -> None:
                 _enter_mode(card["mode"])
 
     st.markdown(
-        theme.section("看到这些词不用慌", "站内术语对照，30 秒扫一遍就够"),
+        theme.fold(
+            "看到这些词不用慌",
+            theme.glossary(LANDING_GLOSS),
+            hint="站内术语对照，30 秒扫一遍就够",
+        ),
         unsafe_allow_html=True,
     )
-    st.markdown(theme.glossary(LANDING_GLOSS), unsafe_allow_html=True)
 
     _render_roster_panel()
 
@@ -1519,6 +1529,97 @@ GAME_PARAM = "g"
 #: 第二个参数：加入码。没有它的话，刷新一次就只剩 URL 能救这一局、名单库不再更新。
 GAME_JOIN_PARAM = "gc"
 _PAYLOAD_VERSION = "v1"
+
+#: 就地解释。每一段挂在它自己那个标题旁边，而不是攒成页顶的一篇说明文——
+#: 读者是在读到某一屏时才产生疑问的，把答案放在别处等于没有答案。
+#: 文案必须与代码实际行为一致：这里写的每一个数字、每一种颜色，都能在上面那屏找到。
+GAME_HELP = {
+    "setup": [
+        ("这块在做什么",
+         "开局前的三个选择：对手数量、每局轮数、随机种子。默认 10 局 × 10 轮，"
+         "也就是 100 步由你自己做的决定。"),
+        ("为什么要自己选",
+         "局数少、轮数短，两分钟就能打完，但 20 步看不出什么模式；"
+         "100 步是能看出倾向的最短路径。时间紧就调小，只是后面的分析会跟着变粗。"),
+        ("随机种子是干什么的",
+         "同一种子生成同一组对手。想和同学比同一套题、或想让评委复现你的结果，"
+         "把种子报给对方就行——决策不同，结果才不同。"),
+    ],
+    "tutorial": [
+        ("这块在做什么",
+         "五轮明牌练习：每轮结束直接告诉你各得几分，但不告诉你对手是谁。"),
+        ("为什么要先明牌",
+         "正式对局里你只能靠对手的行为去猜。教学先把「猜」这件事单独练五轮，"
+         "你才有精力在正式局里做决策。"),
+        ("可以直接跳过吗",
+         "可以。规则就三行（都合作各 3、被背叛 0、都背叛各 1），"
+         "跳过不影响任何结果，也不会记进你的成绩。"),
+    ],
+    "play": [
+        ("这一排在说什么",
+         "一格一局：绿色是你这局分高，橙色是分低，灰色是打平，蓝色是正在打的这局，"
+         "浅米色还没开。右边那个数是跨局总得分。"),
+        ("本轮第 N / M 轮",
+         "本局的进度。分数只在每一轮双方都出完之后才结算，所以本轮的分还没算进去。"),
+        ("为什么不告诉你对手是谁",
+         "正式局里对手身份要等这一局打完才揭晓。你先看到的只有它上一轮做了什么——"
+         "按行为决策，别按名字决策。"),
+    ],
+    "results": [
+        ("这张矩阵怎么读",
+         "行是「本方」，列是「对方」，格子里是行方那一方的得分。"
+         "有「你」的那一行是你对各策略的成绩，那一列是各策略对你的成绩，"
+         "其余格子是策略彼此对局。空白＝这一对没交过手。"),
+        ("颜色深浅",
+         "由浅到深是得分由低到高，不是好与坏——这是分数矩阵，不是对错矩阵。"),
+        ("上面三个数",
+         "总局分是你全部局的总分；每局平均旁边那个差值，是它与「策略平均」的差距；"
+         "策略平均是这些策略两两对局后的平均总分，只当参照线用。"),
+    ],
+    "average": [
+        ("两列的差别",
+         "「对其他策略」是该策略与其余策略对局的平均得分；"
+         "「对你」是它在你手上拿到的平均得分。"),
+        ("为什么要分开看",
+         "一个策略可以打赢全场却在你这儿拿低分——那说明它克制的是别人，"
+         "不是你的打法有问题。反过来也一样。"),
+        ("背叛倾向",
+         "它在全部对局里出背叛的比例，与它对你做了什么无关，是它整体的风格。"),
+    ],
+    "matches": [
+        ("蓝点橙点",
+         "蓝点＝那一格出的是合作，橙点＝背叛。每一格里有两行：上面那行是你，"
+         "下面那行是对手，同一列就是同一轮——所以同一列上下两个蓝点就是都合作。"),
+        ("这一列没有颜色，只有数字",
+         "得分那格里粗体是你的分，灰色是对手的分；「互相合作轮数」是双方都出合作"
+         "的轮数，也就是各拿 3 分的那些轮。"),
+        ("想看逐轮明细",
+         "上面「已完成的局」里点开每一局，有逐轮的选择与得分。"),
+    ],
+    "profile": [
+        ("这些数字是什么",
+         "全部来自对你这 100 步决策的确定性计算：本地算的，不经过大模型。"
+         "每一项都附具体场次轮次的证据，并写明什么观察能推翻它。"),
+        ("这些数字不是什么",
+         "不是心理诊断，也不给人格类型。「出牌风格」只是这些测量的归纳说法，"
+         "描述你在这几局里怎么出牌，换个种子就可能换个说法。"),
+        ("想看得更准怎么办",
+         "单次 100 步够看出倾向，不够看出稳定。要比稳定性，就换种子多打几局，"
+         "或者把轮数调长。"),
+    ],
+    "dimensions": [
+        ("先看哪一层",
+         "上面那张图是九项归到同一 0-100 刻度后的整体位置，先在这儿找哪一项偏离最多；"
+         "下面的卡片才是单项。"),
+        ("每项方向不同",
+         "「回击倾向」高＝被背叛必还手；「单步收益效率」高＝不浪费机会；"
+         "「主动剥削」高＝对方合作时你也出手。高低本身不判好坏，"
+         "要看你面对的是什么对手。"),
+        ("依据在哪",
+         "每张卡片标题旁的 ⓘ 里写着该维度的定义、方向和实际测量口径，"
+         "数字怎么来的都在那儿。"),
+    ],
+}
 
 
 def _match_summary(finished) -> dict:
@@ -1786,7 +1887,10 @@ def _game_finish(placeholder=None) -> None:
 
 
 def _render_game_setup() -> None:
-    st.markdown("### 第一步：设置这一局")
+    st.markdown(
+        theme.heading("第一步：设置这一局", 3, help_blocks=GAME_HELP["setup"]),
+        unsafe_allow_html=True,
+    )
     count = st.slider("对手数量", 4, 12, 10, 1, key="game_opponents")
     turns = st.slider("每局轮数", 5, 20, 10, 1, key="game_turns")
     seed_text = st.text_input(
@@ -1886,6 +1990,9 @@ def _render_game_play() -> None:
             [(m.player_score, m.opponent_score) for m in matches],
             prompt["turn"], prompt["total_turns"],
             sum(m.player_score for m in matches),
+            help_html=theme.help_chip(
+                GAME_HELP["play"], label="这一排点怎么读",
+            ),
         ),
         unsafe_allow_html=True,
     )
@@ -1917,8 +2024,10 @@ def _render_game_play() -> None:
         coop_col, defect_col = st.columns(2)
         with coop_col:
             with st.container(key="tf_move_coop"):
-                if st.button("🤝 合作", key="play_c", width="stretch",
-                             type="primary"):
+                # Both buttons stay the neutral paper variant: making 合作 the
+                # primary would tell a first-time player which move the site
+                # prefers, and this page measures what they choose.
+                if st.button("🤝 合作", key="play_c", width="stretch"):
                     decision = runner.play("C")
                     st.session_state["game_last"] = decision
                     st.rerun()
@@ -2105,7 +2214,10 @@ def _render_completed_match(prompt: dict, runner: PlayerMatchRunner) -> None:
 def _render_game_results() -> None:
     results = st.session_state[GAME_RESULTS_KEY]
     profile = st.session_state[GAME_PROFILE_KEY]
-    st.markdown("### 你的成绩")
+    st.markdown(
+        theme.heading("你的成绩", 3, help_blocks=GAME_HELP["results"]),
+        unsafe_allow_html=True,
+    )
     metric_a, metric_b, metric_c = st.columns(3)
     metric_a.metric("总局分", "{:.0f}".format(results["player_total"]))
     metric_b.metric(
@@ -2123,10 +2235,10 @@ def _render_game_results() -> None:
 
     st.plotly_chart(build_results_figure(results), width="stretch")
 
-    st.markdown("### 平均总得分")
-    st.caption("「对其他策略」为该策略与其余 {} 个策略的平均得分；「对玩家」为它在你手上的平均得分。".format(
-        len(results["table"]) - 1
-    ))
+    st.markdown(
+        theme.heading("平均总得分", 3, help_blocks=GAME_HELP["average"]),
+        unsafe_allow_html=True,
+    )
     st.dataframe(
         [{
             "": "玩家" if row["is_player"] else row["name"],
@@ -2139,8 +2251,10 @@ def _render_game_results() -> None:
     )
 
     st.divider()
-    st.markdown("### 逐局记录")
-    st.caption("蓝点为合作，橙点为背叛。上下两行同一列即同一轮，逐局明细请看每一局的「本局记录」。")
+    st.markdown(
+        theme.heading("逐局记录", 3, help_blocks=GAME_HELP["matches"]),
+        unsafe_allow_html=True,
+    )
     st.markdown(matches_overview(profile["matches"]), unsafe_allow_html=True)
 
     st.divider()
@@ -2152,12 +2266,16 @@ def _render_game_results() -> None:
 def _render_game_profile() -> None:
     profile = st.session_state[GAME_PROFILE_KEY]
     results = st.session_state[GAME_RESULTS_KEY]
-    st.markdown("### 行为分析")
+    st.markdown(
+        theme.heading("行为分析", 3, help_blocks=GAME_HELP["profile"]),
+        unsafe_allow_html=True,
+    )
+    # The disclaimer stays on the page rather than behind the "?": a reader who
+    # never clicks still has to see what these numbers are not. The rest of the
+    # how-to-read text moved into the chip.
     st.caption(
-        "以下每一项都是对你 {} 步决策的测量，附具体场次轮次证据，"
-        "并写明什么观察能推翻它。下面的「出牌风格」是这些测量的归纳，"
-        "描述你在这十局里怎么出牌——不是心理诊断，也不给人格类型。".format(
-            profile["total_turns"]
+        "以下 {} 项都是对你这 {} 步决策的本地测量，不是心理诊断，也不给人格类型。".format(
+            len(profile["dimensions"]), profile["total_turns"]
         )
     )
 
@@ -2196,10 +2314,9 @@ def _render_game_profile() -> None:
 
     # The score cards come first on purpose. A player should be able to read
     # where they stand before reading a single paragraph about why.
-    st.markdown("### 你的九项维度")
-    st.caption(
-        "先看整体位置，再往下看细节。**注意每项方向不同**："
-        "「回击倾向」高表示被背叛必还手，「单步收益效率」高才表示不浪费机会。"
+    st.markdown(
+        theme.heading("你的九项维度", 3, help_blocks=GAME_HELP["dimensions"]),
+        unsafe_allow_html=True,
     )
     st.plotly_chart(build_score_cards(profile), width="stretch")
     cards = st.columns(3)
@@ -2479,7 +2596,10 @@ def _render_tutorial() -> None:
     ``PlayerMatchRunner`` the match uses, so the tutorial shows the genuine
     behaviour of a strategy the player will meet again later.
     """
-    st.markdown("## 新手教程")
+    st.markdown(
+        theme.heading("新手教程", 3, help_blocks=GAME_HELP["tutorial"]),
+        unsafe_allow_html=True,
+    )
     if st.session_state.get(GAME_TUTORIAL_KEY) is None:
         st.session_state[GAME_TUTORIAL_KEY] = TutorialState()
     if st.session_state.get(TUTORIAL_RUNNER_KEY) is None:
@@ -2863,6 +2983,15 @@ def main() -> None:
     # mode return early below and would otherwise miss the theme.
     theme.inject_background()
     theme.inject()
+    # Injected once, before the branches, so the phone rules reach every screen:
+    # the mode picker, the game the students actually play on a phone, and the
+    # creation view. ``layout_mode`` is only set by the creation sidebar, so a
+    # session that never opened it falls back to auto and just gets the media
+    # query -- which is the point, since the tap-target sizing matters most on
+    # the screens that have no sidebar to hide.
+    stylesheet = responsive_css(_layout_mode())
+    if stylesheet:
+        st.markdown(stylesheet, unsafe_allow_html=True)
 
     # 地址栏里带着一局的话，先把它重放回 session_state，再决定渲染哪个模式。
     # 必须在读 ``app_mode`` 之前，否则会先落到模式选择页。
@@ -2880,10 +3009,6 @@ def main() -> None:
     if settings is not None:
         start_simulation(settings)
         st.rerun()
-    # The sidebar radio has run by now, so the chosen mode is known.
-    stylesheet = responsive_css(_layout_mode())
-    if stylesheet:
-        st.markdown(stylesheet, unsafe_allow_html=True)
     # Injected after the responsive sheet on purpose: the viewer must win the
     # specificity contest over the compact 320px chart cap.
     if st.session_state.get("heatmap_fullscreen") is not None:

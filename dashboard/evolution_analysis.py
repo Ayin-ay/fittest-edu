@@ -14,8 +14,6 @@ detail of whichever generations the caller asks to expand.
 
 from __future__ import annotations
 
-from dashboard import theme  # noqa: F401  (kept for colour constants elsewhere)
-
 
 def _fitness(value: float) -> str:
     return "{:.2f}".format(value)

@@ -17,7 +17,15 @@ try:  # Import works both as ``dashboard.render_helpers`` and as a flat module.
 except ImportError:  # pragma: no cover - fallback for package-relative imports
     from ..trust_evolution_simulation import TOTAL_CAPACITY, TrustEvolution
 
+from dashboard import theme
 
+
+#: Categorical colours for strategy identities, not semantic ones. The page's own
+#: triad is taken -- blue is cooperation, orange is defection, green is a settled
+#: mutual outcome -- so an identity hue must never sit on one of those values or a
+#: reader will infer an action from a legend entry. Families are the muted, lighter
+#: half of the range; a species that has broken away takes a saturated jewel tone,
+#: which is what the two sets are for: the same lineage, visibly no longer one.
 _FAMILY_PALETTE = {
     "S": "#d95f5f",
     "P": "#4f81bd",
@@ -25,21 +33,21 @@ _FAMILY_PALETTE = {
     "T": "#e5ae38",
     "D": "#8064a2",
     "W": "#4fb3bf",
-    "B": "#e67e22",
+    "B": "#c8781f",
     "R": "#9b59b6",
     "A": "#8c564b",
-    "K": "#2ca02c",
-    "C": "#7f7f7f",
+    "K": "#7d9b34",
+    "C": "#6d747c",
 }
 _INDEPENDENT_PALETTE = [
-    "#e41a1c",
-    "#377eb8",
-    "#4daf4a",
-    "#984ea3",
-    "#ff7f00",
-    "#a65628",
-    "#f781bf",
-    "#17becf",
+    "#0f6e64",
+    "#8e2a6b",
+    "#1b4e8c",
+    "#a85a00",
+    "#4b2e83",
+    "#0d643c",
+    "#7a1f3d",
+    "#2e6e9e",
 ]
 
 _EVENT_LABELS = {
@@ -53,7 +61,7 @@ _EVENT_LABELS = {
 
 def family_color(encoding: str) -> str:
     """Return the base-strategy color as a hex string."""
-    return _FAMILY_PALETTE.get(encoding[:1], "#999999")
+    return _FAMILY_PALETTE.get(encoding[:1], theme.MUTED)
 
 
 def independent_color(encoding: str) -> str:
@@ -92,33 +100,39 @@ def ordered_encodings(sim: TrustEvolution) -> list[str]:
     return sorted(all_encodings, key=lambda encoding: (birth_by_encoding[encoding], encoding))
 
 
+#: ``(level, label, colour)`` per event. The colours are the page's semantic ones:
+#: a birth is cooperation-blue, an injection is mutual-green, and anything that
+#: ends a lineage takes defection-orange. Colour cannot separate a species-level
+#: extinction from a subspecies-level one, so the label carries the glyph and the
+#: line style below carries the level.
 _EVENT_STYLE = {
-    "subspecies_birth": ("subspecies", "◇ 亚种生成", "#1f77b4"),
-    "subspecies_independent": ("independent", "★ 独立为新物种", "#d62728"),
-    "extinction": ("species", "× 物种灭绝", "#d62728"),
-    "subspecies_extinction": ("subspecies", "× 亚种淘汰", "#ff7f0e"),
-    "injection": ("species", "＋ 策略注入", "#2ca02c"),
+    "subspecies_birth": ("subspecies", "◇ 亚种生成", theme.COOP),
+    "subspecies_independent": ("independent", "★ 独立为新物种", theme.DEFECT),
+    "extinction": ("species", "× 物种灭绝", theme.DEFECT),
+    "subspecies_extinction": ("subspecies", "× 亚种淘汰", theme.MUTED),
+    "injection": ("species", "＋ 策略注入", theme.MUTUAL),
+}
+
+#: ``(dash, width)`` for the vertical marker of each event kind.
+_EVENT_LINES = {
+    "subspecies_birth": ("dash", 1.0),
+    "subspecies_independent": ("dash", 1.5),
+    "extinction": ("dot", 1.0),
+    "subspecies_extinction": ("dot", 1.0),
 }
 
 
 def _add_event_vlines(fig: go.Figure, sim: TrustEvolution) -> None:
     for event in sim.events:
-        if event.event == "subspecies_birth":
-            fig.add_vline(
-                x=event.generation, line_dash="dash", line_color="#1f77b4", line_width=1
-            )
-        elif event.event == "subspecies_independent":
-            fig.add_vline(
-                x=event.generation, line_dash="dash", line_color="#d62728", line_width=1.5
-            )
-        elif event.event == "extinction":
-            fig.add_vline(
-                x=event.generation, line_dash="dot", line_color="#d62728", line_width=1
-            )
-        elif event.event == "subspecies_extinction":
-            fig.add_vline(
-                x=event.generation, line_dash="dot", line_color="#ff7f0e", line_width=1
-            )
+        line = _EVENT_LINES.get(event.event)
+        if line is None:
+            continue
+        fig.add_vline(
+            x=event.generation,
+            line_dash=line[0],
+            line_color=_EVENT_STYLE[event.event][2],
+            line_width=line[1],
+        )
 
 
 def _add_event_annotations(
@@ -190,7 +204,7 @@ def _add_event_annotations(
                 xanchor="center",
                 yanchor="middle",
                 font=dict(size=8, color=color),
-                bgcolor="rgba(255,255,255,0.9)",
+                bgcolor=theme.LABEL_BG,
                 bordercolor=color,
                 borderwidth=1,
                 borderpad=2,
@@ -222,7 +236,7 @@ def _add_band(
         # lazily, so guard against versions that lack the property.
         try:
             trace.fillpattern = dict(
-                shape="/", fgcolor="rgba(255,255,255,0.85)", fillmode="overlay"
+                shape="/", fgcolor=theme.HATCH, fillmode="overlay"
             )
         except (AttributeError, ValueError):
             pass
@@ -332,61 +346,8 @@ def build_population_area(
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="left", x=0),
         margin=dict(l=40, r=20, t=30, b=130),
-        plot_bgcolor="#fafafa",
     )
-    return fig
-
-
-def build_fitness_chart(
-    sim: TrustEvolution, names: dict[str, str] | None = None
-) -> go.Figure:
-    """Fitness line chart; lines break once a species goes extinct."""
-    ordered = ordered_encodings(sim)
-    x = list(range(len(sim.fitness_history)))
-    independent = _independent_encodings(sim)
-
-    fig = go.Figure()
-    for encoding in ordered:
-        values = [snapshot.get(encoding) for snapshot in sim.fitness_history]
-        if not any(value is not None for value in values):
-            continue
-        color = independent_color(encoding) if encoding in independent else family_color(encoding)
-        display = _display_name(names, encoding)
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=values,
-                mode="lines+markers",
-                name=display,
-                line=dict(color=color, width=2),
-                marker=dict(size=4),
-                connectgaps=False,
-                customdata=[encoding] * len(values),
-                hovertemplate=(
-                    f"{display}<br>编码 %{{customdata}}<br>代数 %{{x}}<br>适应度 %{{y:.2f}}<extra></extra>"
-                ),
-            )
-        )
-
-    for event in sim.events:
-        if event.event in {"extinction", "subspecies_extinction"}:
-            fig.add_vline(
-                x=event.generation,
-                line_dash="dot",
-                line_color="#888888",
-                line_width=1,
-            )
-
-    fig.update_layout(
-        height=340,
-        yaxis=dict(title="适应度", range=[0, 5], fixedrange=True),
-        xaxis=dict(title="代数"),
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=-0.45, xanchor="left", x=0),
-        margin=dict(l=40, r=20, t=20, b=120),
-        plot_bgcolor="#fafafa",
-    )
-    return fig
+    return theme.apply_chart_theme(fig)
 
 
 def _species_rows(record) -> list[tuple[str, int, dict | None, int]]:
@@ -423,13 +384,13 @@ def build_snapshot_html(
                 f"""
                 <div style="margin: 8px 0;">
                     <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                        <span><b>{display}</b> <span style="color:#aaa;font-size:10px;">{encoding}</span></span>
-                        <span style="color: #666;">{population}+{subspecies['size']}=<b>{total}</b></span>
+                        <span><b>{display}</b> <span style="color:{theme.FAINT};font-size:10px;">{encoding}</span></span>
+                        <span style="color: {theme.MUTED};">{population}+{subspecies['size']}=<b>{total}</b></span>
                     </div>
-                    <div style="background: #f0f0f0; height: 18px; border-radius: 4px; overflow: hidden; display: flex;">
+                    <div style="background: {theme.LINE}; height: 18px; border-radius: 4px; overflow: hidden; display: flex;">
                         <div style="width: {orig_width}%; background: {color}; height: 100%;"></div>
                         <div style="width: {sub_width}%; height: 100%; background: repeating-linear-gradient(
-                            45deg, {sub_color}, {sub_color} 3px, rgba(255,255,255,0.7) 3px, rgba(255,255,255,0.7) 6px
+                            45deg, {sub_color}, {sub_color} 3px, {theme.HATCH_SOFT} 3px, {theme.HATCH_SOFT} 6px
                         );"></div>
                     </div>
                 </div>
@@ -440,53 +401,30 @@ def build_snapshot_html(
                 f"""
                 <div style="margin: 8px 0;">
                     <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                        <span><b>{display}</b> <span style="color:#aaa;font-size:10px;">{encoding}</span></span>
+                        <span><b>{display}</b> <span style="color:{theme.FAINT};font-size:10px;">{encoding}</span></span>
                         <span><b>{total}</b></span>
                     </div>
-                    <div style="background: #f0f0f0; height: 18px; border-radius: 4px; overflow: hidden;">
+                    <div style="background: {theme.LINE}; height: 18px; border-radius: 4px; overflow: hidden;">
                         <div style="width: {bar_width}%; background: {color}; height: 100%;"></div>
                     </div>
                 </div>
                 """
             )
     if not parts:
-        return "<p style='color:#888;'>本代没有存活物种。</p>"
+        return f"<p style='color:{theme.MUTED};'>本代没有存活物种。</p>"
     return "\n".join(parts)
 
 
-def build_fitness_html(sim: TrustEvolution, generation: int) -> str:
-    """Right-column fitness list with up/down/flat trend arrows."""
-    generation = max(0, min(generation, len(sim.fitness_history) - 1))
-    snapshot = sim.fitness_history[generation]
-    previous = sim.fitness_history[generation - 1] if generation > 0 else {}
-    rows = sorted(
-        ((encoding, value) for encoding, value in snapshot.items() if value is not None),
-        key=lambda row: row[1],
-        reverse=True,
-    )
-    parts: list[str] = []
-    for encoding, fitness in rows:
-        if generation == 0 or encoding not in previous:
-            trend, trend_color = "─", "#888888"
-        else:
-            diff = fitness - previous[encoding]
-            if diff > 0.05:
-                trend, trend_color = "▲", "#2ca02c"
-            elif diff < -0.05:
-                trend, trend_color = "▼", "#d62728"
-            else:
-                trend, trend_color = "─", "#888888"
-        parts.append(
-            f"""
-            <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px;">
-                <span><b>{encoding}</b></span>
-                <span>{fitness:.2f} <span style="color: {trend_color};">{trend}</span></span>
-            </div>
-            """
-        )
-    if not parts:
-        return "<p style='color:#888;'>暂无适应度数据。</p>"
-    return "\n".join(parts)
+def _empty_figure(height: int, title: str) -> go.Figure:
+    """A themed figure with nothing to plot.
+
+    An empty state still sits inside the page, so it has to carry the same paper,
+    ink and gridline colours as the figure it stands in for -- otherwise the
+    placeholder is the one white card on the screen.
+    """
+    fig = go.Figure()
+    fig.update_layout(height=height, title=title)
+    return theme.apply_chart_theme(fig)
 
 
 def build_matchup_heatmap(
@@ -498,13 +436,7 @@ def build_matchup_heatmap(
     generation = max(0, min(generation, len(sim.generation_records) - 1))
     matrix = sim.generation_records[generation].matchup_matrix
     if not matrix:
-        fig = go.Figure()
-        fig.update_layout(
-            height=420,
-            title="对战矩阵（该代暂无数据）",
-            plot_bgcolor="#fafafa",
-        )
-        return fig
+        return _empty_figure(420, "对战矩阵（该代暂无数据）")
 
     axis = sorted(matrix.keys())
     axis_labels = [_display_name(names, encoding) for encoding in axis]
@@ -514,7 +446,7 @@ def build_matchup_heatmap(
             z=z,
             x=axis_labels,
             y=axis_labels,
-            colorscale="RdYlGn",
+            colorscale=theme.SCORE_RAMP,
             colorbar=dict(title="平均得分"),
             hovertemplate="本方 %{y}<br>对方 %{x}<br>得分 %{z:.2f}<extra></extra>",
         )
@@ -525,9 +457,8 @@ def build_matchup_heatmap(
         xaxis=dict(title="对手策略", tickangle=-45),
         yaxis=dict(title="本方策略", autorange="reversed"),
         margin=dict(l=40, r=20, t=60, b=120),
-        plot_bgcolor="#fafafa",
     )
-    return fig
+    return theme.apply_chart_theme(fig)
 
 
 # Row height and top-margin ceilings for the fullscreen heatmap. Upright labels
@@ -577,11 +508,7 @@ def build_heatmap_detail(
     matrix = sim.generation_records[generation].matchup_matrix
     axis = sorted(matrix) if matrix else []
     if not axis:
-        fig = go.Figure()
-        fig.update_layout(
-            height=420, title="对战矩阵（该代暂无数据）", plot_bgcolor="#fafafa"
-        )
-        return fig
+        return _empty_figure(420, "对战矩阵（该代暂无数据）")
 
     full = [_display_name(names, encoding) for encoding in axis]
     count = len(axis)
@@ -622,7 +549,7 @@ def build_heatmap_detail(
             x=top,
             y=left,
             customdata=custom,
-            colorscale="RdYlGn",
+            colorscale=theme.SCORE_RAMP,
             colorbar=dict(
                 title=dict(text="得分", font=dict(size=10)),
                 thickness=10,
@@ -666,7 +593,7 @@ def build_heatmap_detail(
             # the figure and only their last characters survive.
             automargin=True,
             showgrid=True,
-            gridcolor="rgba(255,255,255,0.9)",
+            gridcolor=theme.SURFACE,
             gridwidth=1,
             fixedrange=False,
         ),
@@ -679,7 +606,7 @@ def build_heatmap_detail(
             ticks="",
             automargin=True,
             showgrid=True,
-            gridcolor="rgba(255,255,255,0.9)",
+            gridcolor=theme.SURFACE,
             gridwidth=1,
             fixedrange=False,
         ),
@@ -688,7 +615,7 @@ def build_heatmap_detail(
         dragmode="pan",
         font=dict(size=11),
     )
-    return fig
+    return theme.apply_chart_theme(fig)
 
 
 def build_evolution_tree(
@@ -784,7 +711,7 @@ def build_evolution_tree(
                     symbol="diamond" if is_subspecies else "circle",
                     size=min(30, 10 + peak * 0.4),
                     color=family,
-                    line=dict(color="black", width=1),
+                    line=dict(color=theme.INK, width=1),
                 ),
                 showlegend=False,
                 hovertemplate=(
@@ -803,8 +730,8 @@ def build_evolution_tree(
             yanchor="bottom",
             xshift=8,
             yshift=6,
-            font=dict(size=9, color="#1f77b4" if is_subspecies else "#333333"),
-            bgcolor="rgba(255,255,255,0.75)",
+            font=dict(size=9, color=theme.COOP if is_subspecies else theme.CHART_FONT),
+            bgcolor=theme.LABEL_BG_SOFT,
         )
 
         if indep_generation is not None:
@@ -817,7 +744,7 @@ def build_evolution_tree(
                         symbol="star",
                         size=16,
                         color=independent_color(encoding),
-                        line=dict(color="black", width=1),
+                        line=dict(color=theme.INK, width=1),
                     ),
                     showlegend=False,
                     hovertemplate=(
@@ -833,8 +760,8 @@ def build_evolution_tree(
                 arrowhead=2,
                 ax=0,
                 ay=-22,
-                font=dict(size=9, color="#d62728"),
-                bgcolor="rgba(255,245,245,0.85)",
+                font=dict(size=9, color=theme.DEFECT),
+                bgcolor=theme.DEFECT_WASH,
             )
 
         if encoding in extinction:
@@ -846,8 +773,8 @@ def build_evolution_tree(
                 arrowhead=2,
                 ax=0,
                 ay=22,
-                font=dict(size=9, color="#d62728"),
-                bgcolor="rgba(255,245,245,0.85)",
+                font=dict(size=9, color=theme.DEFECT),
+                bgcolor=theme.DEFECT_WASH,
             )
 
     for event in sim.events:
@@ -863,7 +790,10 @@ def build_evolution_tree(
                 y=[total_rows - index[parent], total_rows - index[event.encoding]],
                 mode="lines",
                 line=dict(
-                    color="#d62728" if independent_child else "#888888",
+                    # The same colour the event carries everywhere else; dash and
+                    # width are what separate a subspecies branch from a full
+                    # independence here.
+                    color=_EVENT_STYLE[event.event][2],
                     width=2 if independent_child else 1,
                     dash="solid" if independent_child else "dash",
                 ),
@@ -881,22 +811,8 @@ def build_evolution_tree(
         xaxis=dict(title="代数"),
         yaxis=dict(showticklabels=False, range=[-0.2, total_rows + 1.4]),
         margin=dict(l=40, r=180, t=60, b=40),
-        plot_bgcolor="#fafafa",
     )
-    return fig
-
-
-def event_rows(sim: TrustEvolution) -> list[dict]:
-    """Flatten the event log into rows for a table."""
-    return [
-        {
-            "代数": event.generation,
-            "事件": _EVENT_LABELS.get(event.event, event.event),
-            "编码": event.encoding,
-            "父代": event.parent_encoding or "-",
-        }
-        for event in sim.events
-    ]
+    return theme.apply_chart_theme(fig)
 
 
 def _independence_generation(sim: TrustEvolution, encoding: str) -> int | None:
@@ -1001,9 +917,7 @@ def build_distribution_bar(
     """
     entries = _bar_entries(sim, generation, names)
     if not entries:
-        fig = go.Figure()
-        fig.update_layout(height=320, title="该轮没有存活策略", plot_bgcolor="#fafafa")
-        return fig
+        return _empty_figure(320, "该轮没有存活策略")
 
     labels = [entry[0] for entry in entries]
     codes = [entry[1] for entry in entries]
@@ -1017,7 +931,7 @@ def build_distribution_bar(
             orientation="h",
             marker=dict(
                 color=colors,
-                pattern=dict(shape=patterns, fgcolor="white", fillmode="overlay"),
+                pattern=dict(shape=patterns, fgcolor=theme.HATCH, fillmode="overlay"),
             ),
             text=[str(value) for value in values],
             textposition="outside",
@@ -1031,9 +945,8 @@ def build_distribution_bar(
         xaxis=dict(title="规模", range=[0, TOTAL_CAPACITY], fixedrange=True),
         yaxis=dict(title="", autorange="reversed"),
         margin=dict(l=10, r=40, t=50, b=40),
-        plot_bgcolor="#fafafa",
     )
-    return fig
+    return theme.apply_chart_theme(fig)
 
 
 def build_distribution_pie(
@@ -1044,9 +957,7 @@ def build_distribution_pie(
     """Pie of lineages; non-independent subspecies shade their parent's region."""
     entries = _pie_entries(sim, generation, names)
     if not entries:
-        fig = go.Figure()
-        fig.update_layout(height=340, title="该轮没有存活策略")
-        return fig
+        return _empty_figure(340, "该轮没有存活策略")
     labels = [entry[0] for entry in entries]
     codes = [entry[1] for entry in entries]
     values = [entry[2] for entry in entries]
@@ -1059,8 +970,8 @@ def build_distribution_pie(
             customdata=codes,
             marker=dict(
                 colors=colors,
-                line=dict(color="#ffffff", width=1),
-                pattern=dict(shape=patterns, fgcolor="rgba(255,255,255,0.85)", fillmode="overlay"),
+                line=dict(color=theme.CHART_PAPER, width=1),
+                pattern=dict(shape=patterns, fgcolor=theme.HATCH, fillmode="overlay"),
             ),
             hole=0.45,
             sort=False,
@@ -1074,7 +985,7 @@ def build_distribution_pie(
         margin=dict(l=10, r=10, t=50, b=10),
         showlegend=False,
     )
-    return fig
+    return theme.apply_chart_theme(fig)
 
 
 def build_change_rows(
@@ -1212,7 +1123,7 @@ def events_at(
     for event in sim.events:
         if event.generation != generation:
             continue
-        _, label, color = _EVENT_STYLE.get(event.event, ("", event.event, "#333333"))
+        _, label, color = _EVENT_STYLE.get(event.event, ("", event.event, theme.CHART_FONT))
         rows.append(
             {
                 "事件": label,

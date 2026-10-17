@@ -34,6 +34,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
+from dashboard import theme
 from dashboard.visuals import dimension_scores
 
 # --------------------------------------------------------------------------
@@ -41,14 +42,16 @@ from dashboard.visuals import dimension_scores
 # --------------------------------------------------------------------------
 
 W, H = 1080, 1440
-BG = "#FBF7F0"
-INK = "#241F1A"
+# 能对上主题令牌的都在这里对上：卡片和页面各写一份"差不多的米色"，改一处就漏一处。
+BG = theme.GROUND
+INK = theme.INK
+ACCENT = theme.COOP
+RULE = theme.LINE
+PANEL = theme.RAISED
+MUTE = theme.FAINT
+#: 卡片独有的两档：介于正文与次级文字之间的墨色，以及比面板再浅一档的九宫格底。
+#: 页面上没有对应角色，所以留在卡面这一侧，不塞进主题里充数。
 INK2 = "#4A423A"
-MUTE = "#8A8078"
-ACCENT = "#2E7DE4"
-RULE = "#E4DACA"
-PANEL = "#F5EFE4"
-#: 九宫格单元格的底色：比面板再浅一档，卡片里才有层次，不然一片糊。
 PANEL2 = "#FFFCF6"
 
 DEFAULT_URL = "fittest-edu.streamlit.app"

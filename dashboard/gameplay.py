@@ -24,7 +24,14 @@ import random
 from dataclasses import asdict, dataclass, field
 from typing import Callable
 
-from dashboard.theme import apply_chart_theme
+from dashboard.theme import (
+    COOP,
+    DEFECT,
+    MUTED,
+    MUTUAL,
+    SCORE_RAMP,
+    apply_chart_theme,
+)
 
 from strategy_engine.strategy_engine import (
     StrategyState,
@@ -139,10 +146,10 @@ def action_badge(action: str, who: str) -> str:
 # What the round was, from the player's side: the four combinations, each named
 # for what it did rather than for the score it produced.
 RELATIONSHIPS = {
-    ("C", "C"): ("共赢", "#21A179"),
-    ("D", "D"): ("互害", "#6B6156"),
-    ("D", "C"): ("背刺", "#E4572E"),
-    ("C", "D"): ("被剥削", "#2E7DE4"),
+    ("C", "C"): ("共赢", MUTUAL),
+    ("D", "D"): ("互害", MUTED),
+    ("D", "C"): ("背刺", DEFECT),
+    ("C", "D"): ("被剥削", COOP),
 }
 
 
@@ -227,12 +234,17 @@ def stage_strip(
     turn: int,
     turns: int,
     total_score: float,
+    help_html: str = "",
 ) -> str:
     """Where the player is: which matches are done, which turn is live.
 
     ``outcomes`` is the finished matches as (your score, their score) pairs, so
     the pips can tell a won match from a lost one -- a progress bar could only
     count them.
+
+    ``help_html`` is the caller's in-place ``?`` explainer. It rides the top row
+    because that is the row whose colours need explaining; as a block under the
+    strip it would read as commentary on the next screen instead.
     """
     pips = []
     for index in range(match_count):
@@ -264,7 +276,7 @@ def stage_strip(
         "<div class='tf-stage__top'>"
         "<span class='tf-stage__kicker'>对局</span>"
         "<span class='tf-stage__count'>第 %d<em> / %d 局</em></span>"
-        "<span class='tf-stage__total'>跨局总得分<b>%s</b></span>"
+        "<span class='tf-stage__total'>跨局总得分<b>%s</b></span>%s"
         "</div>"
         "<div class='tf-pips'>%s</div>"
         "<div class='tf-track'><div class='tf-track__fill' style='width:%.1f%%'></div></div>"
@@ -274,7 +286,7 @@ def stage_strip(
         "</div>"
         "</div>"
         % (
-            len(outcomes) + 1, match_count, _whole(total_score),
+            len(outcomes) + 1, match_count, _whole(total_score), help_html,
             "".join(pips), share, turn_label, secret,
         )
     )
@@ -755,7 +767,9 @@ def build_results_figure(results: dict) -> "go.Figure":
             y=results["axis"],
             text=text,
             texttemplate="%{text}",
-            colorscale="RdYlGn",
+            # The shared value ramp, not a red-yellow-green diverging scale: this
+            # matrix is scores, and orange already means defection elsewhere.
+            colorscale=SCORE_RAMP,
             zmin=0,
             colorbar=dict(title="本方得分", thickness=12, len=0.85, x=1.02),
             hovertemplate=(

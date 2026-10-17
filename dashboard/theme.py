@@ -8,8 +8,10 @@ green. That cycle is also the subject matter, so the same three carry the same
 meanings here: orange is defection, blue is cooperation, green is a settled
 mutual outcome.
 
-Every colour is derived from ``GROUND``/``INK`` below rather than repeated as
-literals, so re-theming stays a matter of editing six values.
+Named colours live here and every module that draws chrome or a chart imports
+them, so there is one palette to edit. The stylesheet below is the exception: it
+is a large literal with its own tints baked in, and the token dict only covers
+the values it interpolates.
 
 The choice buttons carry more than colour: the icon and the word are in the
 label, so the action is still unambiguous in greyscale, on a phone, or for a
@@ -38,6 +40,27 @@ MUTUAL = "#21A179"
 COOP_WASH = "#E7F0FC"
 DEFECT_WASH = "#FCEAE2"
 MUTUAL_WASH = "#E4F3EE"
+
+#: A mute lighter than ``MUTED``, for text that sits on the paper ground and
+#: must stay readable without competing with the headings. The share card used
+#: its own near-identical value (``#8A8078``), which is how palettes drift: two
+#: shades one step apart, each looking intentional.
+FAINT = "#8A8073"
+
+#: Elevation for the two layers that float above the page: the pinned module and
+#: the detail window (which becomes a bottom sheet on a phone). They live in
+#: ``app.py`` and ``responsive.py`` as inline strings, so they were the one part
+#: of the UI still shading with neutral ``rgba(0,0,0,...)`` and bordering with
+#: ``rgba(128,128,128,...)`` -- a greyer palette than the warm paper underneath
+#: them. These are the stylesheet's own ``rgba(60,45,25,...)`` shadows, named.
+SHADOW_PIN = "0 6px 18px rgba(60,45,25,.13)"
+SHADOW_FLOAT = "0 8px 28px rgba(60,45,25,.18)"
+SHADOW_SHEET = "0 -8px 26px rgba(60,45,25,.22)"
+#: Border for a raised layer. Slightly stronger than ``LINE``, which is a hairline
+#: between flat neighbours and disappears around a floating card.
+EDGE = "rgba(60,45,25,.24)"
+#: The drag handle drawn on top of the mobile bottom sheet.
+GRIP = "rgba(60,45,25,.30)"
 
 # The stack ends in sans-serif, not serif, and carries an emoji family before
 # it. Titles use decorative emoji (🎮 / 🎛); with a serif fallback Windows
@@ -896,7 +919,7 @@ a { color: #2E7DE4; }
   margin-top: .55rem;
   font-size: .78rem;
   line-height: 1.5;
-  color: #8A8073;
+  color: %(faint)s;
 }
 .tf-track {
   height: .4rem;
@@ -1099,6 +1122,108 @@ code {
 }
 hr { border-color: #E4DACA; }
 
+/* --- Collapsible explanations ------------------------------------------ */
+/* The landing page's three "what is this site" blocks were always-on prose, so
+   reaching the two mode buttons meant scrolling past a screen of text. A
+   ``<details>`` keeps the heading where it was and moves the paragraphs behind
+   one click -- and because it is plain HTML, opening it costs no server rerun,
+   which a Streamlit widget would. */
+details.tf-fold {
+  border: 1px solid #E4DACA;
+  border-radius: 14px;
+  background: #FFFFFF;
+  margin: 0 0 1rem;
+  box-shadow: 0 1px 3px rgba(60,45,25,.05);
+}
+details.tf-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: .85rem 1.1rem;
+  color: #241F1A;
+  font-weight: 650;
+}
+details.tf-fold > summary::-webkit-details-marker { display: none; }
+details.tf-fold[open] > summary {
+  border-bottom: 1px solid #E4DACA;
+  background: #F5EFE4;
+  border-radius: 13px 13px 0 0;
+}
+.tf-fold .tf-tri {
+  color: #8A8073;
+  font-size: .8em;
+  transform: rotate(0deg);
+  transition: transform .16s ease;
+}
+.tf-fold[open] .tf-tri { transform: rotate(90deg); }
+.tf-fold .tf-fold-hint {
+  margin-left: auto;
+  color: #8A8073;
+  font-weight: 400;
+  font-size: .85rem;
+}
+.tf-fold-body { padding: 1.1rem 1.2rem 1.25rem; }
+.tf-fold-body > :first-child { margin-top: 0; }
+.tf-fold-body .tf-card { border: 0; padding: 0; box-shadow: none; background: transparent; }
+
+/* The round "?" beside a section title. The explanation belongs next to the
+   thing it explains, so the panel opens in place instead of the page growing:
+   absolutely positioned, out of the flow, anchored to its heading row. */
+.tf-hrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: relative;
+}
+.tf-hrow h1, .tf-hrow h2, .tf-hrow h3, .tf-hrow h4 { margin: 0; border-bottom: 0; }
+.tf-hrow > .tf-hrow-gloss { font-style: normal; font-size: .92rem; color: #6B6156; }
+details.tf-help { position: relative; }
+details.tf-help > summary {
+  list-style: none;
+  cursor: pointer;
+  width: 1.35rem;
+  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2E7DE4;
+  border-radius: 50%%;
+  background: #FFFFFF;
+  color: #2E7DE4;
+  font-size: .82rem;
+  font-weight: 700;
+  line-height: 1;
+}
+details.tf-help > summary::-webkit-details-marker { display: none; }
+details.tf-help > summary:hover { background: #E7F0FC; }
+details.tf-help[open] > summary { background: #2E7DE4; color: #FBF7F0; }
+.tf-help-panel {
+  position: absolute;
+  top: calc(100%% + 8px);
+  left: 0;
+  z-index: 900;
+  width: min(640px, 92vw);
+  text-align: left;
+  background: #FFFFFF;
+  border: 1px solid rgba(60,45,25,.24);
+  border-left: 4px solid #2E7DE4;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(60,45,25,.18);
+  padding: .9rem 1.1rem 1rem;
+}
+.tf-help-panel p.tf-help-k {
+  margin: .85rem 0 .1rem;
+  color: #2E7DE4;
+  font-size: .85rem;
+  font-weight: 650;
+  letter-spacing: .01em;
+}
+.tf-help-panel p.tf-help-k:first-child { margin-top: 0; }
+.tf-help-panel p.tf-help-t { margin: 0; font-size: .96rem; line-height: 1.65; }
+
 /* --- Narrow screens ---------------------------------------------------- */
 @media (max-width: 860px) {
   /* Illustration above the text: it explains the page, so on a phone it earns
@@ -1113,6 +1238,11 @@ hr { border-color: #E4DACA; }
   .tf-arch > div:first-child { border-top: 0; padding-top: 0; }
   .tf-move button, .st-key-tf_move_coop button,
   .st-key-tf_move_defect button { min-height: 3.2rem; font-size: .98rem; }
+  /* The "不点也能直接开始" aside is a desktop nicety; on a phone it wraps the
+     summary onto a second line and makes the tap target ambiguous. */
+  .tf-fold .tf-fold-hint { display: none; }
+  .tf-fold > summary { padding: .7rem .85rem; }
+  .tf-fold-body { padding: .9rem .95rem 1rem; }
   h2 { font-size: 1.3rem !important; }
   p, li { font-size: .95rem; }
 }
@@ -1130,6 +1260,7 @@ hr { border-color: #E4DACA; }
         "coop_wash": COOP_WASH,
         "defect_wash": DEFECT_WASH,
         "mutual_wash": MUTUAL_WASH,
+        "faint": FAINT,
         "font": FONT_STACK,
         "h1": H1_SIZE,
         "h2": H2_SIZE,
@@ -1139,11 +1270,35 @@ hr { border-color: #E4DACA; }
     }
 
 
-CHART_BG = "#FFFFFF"
-CHART_PAPER = "#FBF7F0"
+#: Chart surfaces are the page's own values, named for the role they play inside
+#: a figure. ``CHART_GRID`` is the one that differs from the UI chrome: a gridline
+#: needs to be lighter than a panel border to stay behind the data.
+CHART_BG = SURFACE
+CHART_PAPER = GROUND
 CHART_GRID = "#EDE4D6"
-CHART_FONT = "#241F1A"
-CHART_TICK = "#6B6156"
+CHART_FONT = INK
+CHART_TICK = MUTED
+
+#: ``CHART_BG`` at two opacities, for the plate behind an in-plot label. The label
+#: has to stay readable where it crosses a bar or a gridline, so it takes the plot
+#: area's own colour with just enough transparency to hint at what is under it.
+LABEL_BG = "rgba(255,255,255,.9)"
+LABEL_BG_SOFT = "rgba(255,255,255,.75)"
+#: The diagonal hatch that marks a subspecies segment. Drawn over a saturated
+#: family colour, so it stays white rather than the page's warm ground.
+HATCH = "rgba(255,255,255,.85)"
+#: The same hatch where it runs over a solid bar in the HTML snapshot: a little
+#: more transparent, so the family colour under it still reads as the dominant
+#: hue at a glance.
+HATCH_SOFT = "rgba(255,255,255,.7)"
+
+#: Sequential ramp for a score matrix: the page's own paper tone up to the brand
+#: blue. A value scale, not an action scale -- the triad already means cooperation
+#: / defection / mutual, so the red-yellow-green diverging scale it replaced would
+#: have read as those meanings rather than as more or fewer points. Used by the
+#: session matrix and by both sandbox matchup matrices, which measure the same
+#: thing; Plotly normalises it to each figure's own min and max.
+SCORE_RAMP = [[0, RAISED], [1, COOP]]
 
 
 def apply_chart_theme(fig):
@@ -1152,6 +1307,10 @@ def apply_chart_theme(fig):
     Streamlit renders Plotly with its own light template, which paints a pure
     white card. Against the warm ground that reads as a hole in the page, so the
     paper and plot colours are set from the same values as the stylesheet.
+
+    Margins are deliberately not set here: every figure lays its own out (a
+    horizontal bar chart needs a wide left gutter for its Chinese labels), and
+    this function runs last, so a default here would silently win.
     """
     fig.update_layout(
         paper_bgcolor=CHART_PAPER,
@@ -1162,7 +1321,6 @@ def apply_chart_theme(fig):
         yaxis=dict(gridcolor=CHART_GRID, linecolor=CHART_GRID,
                    zerolinecolor=CHART_GRID, tickfont=dict(color=CHART_TICK)),
         legend=dict(font=dict(color=CHART_TICK)),
-        margin=dict(l=60, r=30, t=30, b=50),
     )
     return fig
 
@@ -1171,6 +1329,65 @@ def section(title: str, gloss: str = "") -> str:
     """A heading with its one-line gloss on the same baseline."""
     tail = '<i>{}</i>'.format(gloss) if gloss else ""
     return '<div class="tf-sec"><h2>{}</h2>{}</div>'.format(title, tail)
+
+
+def fold(title: str, body: str, *, hint: str = "", expanded: bool = False) -> str:
+    """An explanation that starts collapsed: the heading stays, the prose waits.
+
+    ``body`` is already-rendered markup from the other helpers, so a block can
+    move behind a click without changing what it looks like once opened.
+    """
+    tail = '<span class="tf-fold-hint">{}</span>'.format(hint) if hint else ""
+    return (
+        '<details class="tf-fold"{open}>'
+        '<summary><span class="tf-tri" aria-hidden="true">&#9656;</span>'
+        "<span>{title}</span>{hint}</summary>"
+        '<div class="tf-fold-body">{body}</div>'
+        "</details>"
+    ).format(
+        open=" open" if expanded else "",
+        title=title,
+        hint=tail,
+        body=body,
+    )
+
+
+def help_chip(blocks: list[tuple[str, str]], *, label: str = "这块在做什么") -> str:
+    """The round ``?`` that opens an in-place glossary beside a heading.
+
+    A question mark rather than an ``st.info`` callout: the callout is a block,
+    so it takes page height even when the reader already knows the answer.
+    """
+    body = "".join(
+        '<p class="tf-help-k">{}</p><p class="tf-help-t">{}</p>'.format(head, text)
+        for head, text in blocks
+    )
+    return (
+        '<details class="tf-help">'
+        '<summary aria-label="{label}" title="{label}">?</summary>'
+        '<div class="tf-help-panel">{body}</div>'
+        "</details>"
+    ).format(label=label, body=body)
+
+
+def heading(
+    title: str,
+    level: int = 3,
+    *,
+    gloss: str = "",
+    help_blocks: list[tuple[str, str]] | None = None,
+    help_label: str = "这块在做什么",
+) -> str:
+    """A markdown heading on the same line as its optional gloss and ``?`` chip.
+
+    The chip has to share the heading's line: on its own row it reads as a
+    separate control belonging to whatever comes next.
+    """
+    tail = '<span class="tf-hrow-gloss">{}</span>'.format(gloss) if gloss else ""
+    chip = help_chip(help_blocks, label=help_label) if help_blocks else ""
+    return '<div class="tf-hrow"><h{lvl}>{title}</h{lvl}>{gloss}{chip}</div>'.format(
+        lvl=level, title=title, gloss=tail, chip=chip
+    )
 
 
 # The three rows of the payoff matrix, drawn as two dots and the relation

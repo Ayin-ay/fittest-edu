@@ -20,7 +20,21 @@ from __future__ import annotations
 import plotly.graph_objects as go
 
 from dashboard.profiling import Dimension
-from dashboard.theme import apply_chart_theme
+from dashboard.theme import (
+    COOP,
+    COOP_WASH,
+    DEFECT,
+    MUTED,
+    MUTUAL,
+    apply_chart_theme,
+)
+
+# Colour carries the same meaning here as everywhere else in the app: blue is
+# cooperation, orange is defection, green is a settled mutual outcome, grey is
+# the player's own measure or the rest of the field. Plotly's default
+# red/green/orange palette said nothing of the sort -- and on the action map it
+# ran the wrong way round, painting mutual defection green-to-red while the rest
+# of the page had already taught the reader that orange is the hostile colour.
 
 # Radar axes need a common 0-1 scale, so each dimension contributes a value that
 # is meaningful in isolation. The scale for each is chosen so that 0.5 is the
@@ -92,12 +106,10 @@ def build_score_cards(profile: dict) -> "go.Figure":
             x=[r["percent"] for r in rows],
             y=[r["label"] for r in rows],
             orientation="h",
-            marker_color=[
-                "#d62728" if r["percent"] >= 70 else
-                "#ff7f0e" if r["percent"] >= 40 else
-                "#2ca02c" if r["percent"] > 0 else "#cccccc"
-                for r in rows
-            ],
+            # One colour for all nine: the axis says outright that a high value
+            # is not necessarily good, so a red/green ramp would contradict the
+            # caption right next to it.
+            marker_color=COOP,
             text=["{}%　{}".format(r["percent"], r["direction"]) for r in rows],
             textposition="auto",
             hovertemplate="%{y}<br>得分 %{x}%<extra></extra>",
@@ -130,7 +142,8 @@ def build_radar(profile: dict) -> go.Figure:
             theta=closed,
             fill="toself",
             name="本次",
-            line=dict(color="#1f77b4"),
+            line=dict(color=COOP, width=2.5),
+            fillcolor=COOP_WASH,
         )
     )
     fig.update_layout(
@@ -165,7 +178,7 @@ def build_score_trend(profile: dict, results: dict) -> go.Figure:
     fig.add_trace(go.Scatter(
         x=list(range(1, len(matches) + 1)),
         y=player, mode="lines+markers", name="你",
-        line=dict(color="#1f77b4", width=2.5),
+        line=dict(color=COOP, width=2.5),
         text=[c[:18] for c in codes[:len(matches)]],
         hovertemplate="第 %{x} 局<br>你 %{y} 分<br>对手 %{customdata}<extra></extra>",
         customdata=[o for o in opponent],
@@ -173,10 +186,10 @@ def build_score_trend(profile: dict, results: dict) -> go.Figure:
     fig.add_trace(go.Scatter(
         x=list(range(1, len(matches) + 1)),
         y=opponent, mode="lines+markers", name="对手",
-        line=dict(color="#d62728", width=1.5, dash="dot"),
+        line=dict(color=DEFECT, width=1.5, dash="dot"),
     ))
     fig.add_hline(
-        y=best_field, line_dash="dash", line_color="#888",
+        y=best_field, line_dash="dash", line_color=MUTED,
         annotation_text="策略平均分 {:.1f}".format(best_field),
         annotation_position="top left",
     )
@@ -216,7 +229,13 @@ def build_action_map(profile: dict) -> go.Figure:
             z=z,
             text=text,
             texttemplate="%{text}",
-            colorscale=[[0, "#2ca02c"], [0.33, "#c7e9c0"], [0.66, "#f7c7c7"], [1, "#d62728"]],
+            # The same four-way naming the per-round ledger uses (共赢 / 被剥削 /
+            # 背刺 / 互害), and the same colours: ``gameplay.RELATIONSHIPS`` maps
+            # them to MUTUAL / COOP / DEFECT / MUTED. ``z`` only ever takes 0..3,
+            # so each cell lands exactly on its stop.
+            colorscale=[
+                [0, MUTUAL], [1 / 3, COOP], [2 / 3, DEFECT], [1, MUTED]
+            ],
             zmin=0, zmax=3,
             colorbar=dict(
                 tickvals=[0, 1, 2, 3],
@@ -247,28 +266,30 @@ def build_rate_bars(profile: dict) -> go.Figure:
     labels, values, colors, texts = [], [], [], []
     retaliation = by_key.get("retaliation")
     exploitation = by_key.get("exploitation")
+    # Blue for the bars that count a cooperative choice, orange for the ones
+    # that count a hostile one -- the same split the decision buttons use.
     if retaliation is not None:
         n = retaliation.numbers
         labels.append("被背叛后回击")
         values.append(n.get("rate", 0.0))
         texts.append("{}/{} 步".format(n.get("retaliated", 0), n.get("provoked", 0)))
-        colors.append("#d62728")
+        colors.append(DEFECT)
         labels.append("被背叛时继续合作")
         values.append(1.0 - n.get("rate", 0.0))
         texts.append("{}/{} 步".format(n.get("forgave", 0), n.get("provoked", 0)))
-        colors.append("#2ca02c")
+        colors.append(COOP)
     if exploitation is not None:
         n = exploitation.numbers
         labels.append("对手合作时主动出手")
         values.append(n.get("rate", 0.0))
         texts.append("{}/{} 步".format(n.get("exploits", 0), n.get("opportunities", 0)))
-        colors.append("#ff7f0e")
+        colors.append(DEFECT)
     if by_key.get("opening") is not None:
         n = by_key["opening"].numbers
         labels.append("首轮选择合作")
         values.append(n.get("rate", 0.0))
         texts.append("{}/{} 场".format(n.get("opens", 0), n.get("matches", 0)))
-        colors.append("#1f77b4")
+        colors.append(COOP)
 
     fig = go.Figure(
         data=go.Bar(
@@ -294,7 +315,7 @@ def build_field_standing(profile: dict, results: dict) -> go.Figure:
     labels = [r["name"] for r in table]
     values = [r["vs_others"] for r in table]
     is_player = [r["is_player"] for r in table]
-    colors = ["#1f77b4" if p else "#cccccc" for p in is_player]
+    colors = [COOP if p else MUTED for p in is_player]
     fig = go.Figure(
         data=go.Bar(
             x=values, y=labels, orientation="h",

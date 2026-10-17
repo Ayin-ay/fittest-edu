@@ -82,9 +82,10 @@ SYSTEM_PROMPT = """\
 
 8. 证据不足就直说「这局数据看不出」。不要为了篇幅编造动机。
 
-【输出格式】严格按以下标题输出，不要增删章节：
+【输出格式】严格按以下标题输出，不要增删章节。章节从三级标题起、步骤用四级，
+与站内的版面层级对齐：
 
-## 关键特征
+### 关键特征
 **这一节必须放在最前面，是全文唯一允许「不展开」的部分。**
 
 - 只写 3 到 5 行，一行一条，让人不读下文也能立刻知道该注意什么。
@@ -94,31 +95,31 @@ SYSTEM_PROMPT = """\
   「★ **10 局全部首轮合作**（10/10），在陌生情境下先垫付资源」。
 - 禁止在这一节写建议或推断动机，只写看得见的现象及其数字。
 
-## 关键步骤剖析
+### 关键步骤剖析
 挑五到八步最有信息量的，按下面格式逐步写：
 
-### 第 N 局 · 第 T 轮
+#### 第 N 局 · 第 T 轮
 - **当时的局面**：双方前几轮做了什么，一句话说清。
 - **你的选择与代价**：你出了什么，这一手拿到了几分、另一手能拿几分。
 - **你可能在想什么**：一到两句推断，必须用「可能是」「看起来像」这类措辞，
   并给出推断依据。
 - **换到现实里**：同样的选择如果发生在工作中或人际关系里，会出现什么。
 
-## 你的行为模式
+### 你的行为模式
 去重后的清单，每条包含：观察到的现象（一句话）＋支撑数据（只给一次）＋
 它意味着什么。不要与其他条目重复。
 
-## 诊断
+### 诊断
 分两部分，都要具体：
 - **优势**：这个反应方式在什么场合是有用的（举一个现实例子）。
 - **代价**：它在什么场合会造成损失（举一个现实例子，优先用这次数据里
   真实发生过的场景）。
 
-## 生活与工作中的建议
+### 生活与工作中的建议
 分「立刻可以做的」和「长期要练的」两组，每条都要能直接照着做，
 并说明预期效果和可能的风险。
 
-## 这次数据回答不了什么
+### 这次数据回答不了什么
 列出这局数据无法判断的事情，以及需要多少局、换什么设计才能判断。
 """
 
@@ -417,6 +418,17 @@ def _post(url: str, body: dict, key: str, timeout, proxy: str | None = None,
     )
 
 
+def _body_text(response) -> str:
+    """Read an error body as UTF-8.
+
+    网关经常返回 UTF-8 的中文错误却不声明 charset，requests 于是按 latin-1 解，
+    屏幕上只剩一串乱码——而这句话恰恰是人判断"该改什么"的唯一线索。
+    """
+    if "charset" not in (response.headers.get("Content-Type") or "").lower():
+        response.encoding = "utf-8"
+    return response.text
+
+
 def _call_error(response, url: str, key: str) -> str:
     """Explain a failed call in terms of what the reader can act on.
 
@@ -426,13 +438,13 @@ def _call_error(response, url: str, key: str) -> str:
     status = response.status_code
     if status == 401:
         return "接口拒绝了本站的密钥（{}）。请稍后再试，或联系管理员更换密钥。".format(
-            _sanitize(response.text[:200], key)
+            _sanitize(_body_text(response)[:200], key)
         )
     if status == 402:
         return "本站的调用额度已用尽，请稍后再试。"
     if status == 429:
         return "请求过于频繁，请稍后再试。"
-    return "接口返回 {}：{}".format(status, _sanitize(response.text[:300], key))
+    return "接口返回 {}：{}".format(status, _sanitize(_body_text(response)[:300], key))
 
 
 def probe_connection(timeout: int = 45, key: str | None = None) -> str:
@@ -467,7 +479,7 @@ def probe_connection(timeout: int = 45, key: str | None = None) -> str:
         ) from error
     if response.status_code >= 400:
         raise RuntimeError("{}：{}".format(
-            response.status_code, _sanitize(response.text[:400], key)))
+            response.status_code, _sanitize(_body_text(response)[:400], key)))
     return response.json()["choices"][0]["message"]["content"]
 
 

@@ -15,25 +15,36 @@ from __future__ import annotations
 
 import html
 
+from dashboard import theme
+
 # Rendered the moment the app starts, before any simulation exists. It exists to
 # replace a blank white screen with something that explains what is loading.
-SPLASH_CSS = """
+#
+# Colours come from ``theme`` rather than being written out here: this block is
+# injected on top of the landing page, and the previous cold-grey-blue version
+# sat on the warm paper ground looking like somebody else's app.
+SPLASH_CSS = f"""
 <style>
-@keyframes te-pulse { 0%,100% { opacity:.35 } 50% { opacity:1 } }
-@keyframes te-slide { 0% { transform:translateX(-100%) } 100% { transform:translateX(320%) } }
-@keyframes te-sway { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-4px) } }
-.te-wrap { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
-.te-badge { display:inline-flex; align-items:center; gap:.5rem; color:#4b5563; font-size:.9rem; }
-.te-dot { width:9px; height:9px; border-radius:50%; background:#2563eb; animation:te-pulse 1.3s ease-in-out infinite; }
-.te-title { font-size:2rem; font-weight:700; color:#111827; margin:.2rem 0 .6rem; }
-.te-bar { position:relative; height:5px; width:min(320px,70vw); border-radius:99px;
-          background:#e5e7eb; overflow:hidden; margin:.7rem 0; }
-.te-bar > i { position:absolute; inset:0 auto 0 0; width:34%; border-radius:99px;
-              background:linear-gradient(90deg,#60a5fa,#2563eb); animation:te-slide 1.25s ease-in-out infinite; }
-.te-steps { margin:.5rem 0 0; padding:0; list-style:none; color:#6b7280; font-size:.92rem; line-height:1.9; }
-.te-steps li::before { content:"·"; margin-right:.55rem; color:#9ca3af; }
-.te-chess { font-size:1.7rem; letter-spacing:.35rem; animation:te-sway 2.4s ease-in-out infinite; }
-.te-note { color:#9ca3af; font-size:.85rem; margin-top:.9rem; }
+@keyframes te-pulse {{ 0%,100% {{ opacity:.35 }} 50% {{ opacity:1 }} }}
+@keyframes te-slide {{ 0% {{ transform:translateX(-100%) }} 100% {{ transform:translateX(320%) }} }}
+@keyframes te-sway {{ 0%,100% {{ transform:translateY(0) }} 50% {{ transform:translateY(-4px) }} }}
+.te-wrap {{ font-family: {theme.FONT_STACK}; color: {theme.INK}; }}
+.te-badge {{ display:inline-flex; align-items:center; gap:.5rem;
+             color:{theme.MUTED}; font-size:.9rem; letter-spacing:.02em; }}
+.te-dot {{ width:9px; height:9px; border-radius:50%; background:{theme.COOP};
+           animation:te-pulse 1.3s ease-in-out infinite; }}
+.te-title {{ font-size:2rem; font-weight:700; color:{theme.INK}; margin:.2rem 0 .6rem; }}
+.te-bar {{ position:relative; height:5px; width:min(320px,70vw); border-radius:99px;
+           background:{theme.LINE}; overflow:hidden; margin:.7rem 0; }}
+.te-bar > i {{ position:absolute; inset:0 auto 0 0; width:34%; border-radius:99px;
+               background:linear-gradient(90deg,{theme.COOP_WASH},{theme.COOP});
+               animation:te-slide 1.25s ease-in-out infinite; }}
+.te-steps {{ margin:.5rem 0 0; padding:0; list-style:none; color:{theme.MUTED};
+             font-size:.92rem; line-height:1.9; }}
+.te-steps li::before {{ content:"·"; margin-right:.55rem; color:{theme.LINE}; }}
+.te-chess {{ font-size:1.7rem; letter-spacing:.35rem; color:{theme.MUTUAL};
+             animation:te-sway 2.4s ease-in-out infinite; }}
+.te-note {{ color:{theme.MUTED}; font-size:.85rem; margin-top:.9rem; }}
 </style>
 """
 
@@ -65,16 +76,4 @@ def analysis_loading() -> str:
             "统计九项维度得分与全部决策热图",
         ],
         "只有十几步的计算，通常一闪而过；图表会在你点开时才加载。",
-    )
-
-
-def first_visit() -> str:
-    """Shown on a cold start, where the blank is Streamlit's own wake-up."""
-    return splash(
-        "The Fittest",
-        [
-            "与随机策略对局，每一步都由你决定",
-            "结束后得到得分矩阵与行为解读",
-        ],
-        "如果页面空白片刻，是云端在唤醒应用，稍等即出。",
     )
