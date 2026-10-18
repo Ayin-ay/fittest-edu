@@ -1577,8 +1577,8 @@ def _render_assignment_desk(runs: list[dict], default_class: str) -> None:
     form_c, form_d = st.columns([6, 3], gap="small")
     with form_c:
         demo_fill = st.checkbox(
-            "演示：每点一次「刷新名单」收一批虚拟提交", key="assign_demo", value=True,
-            help="给参观用。每一行都带模拟标记，看板会整屏挂「模拟数据，非真实课堂」的牌子；"
+            "演示：每点一次「刷新名单」收一批虚拟提交", key="assign_demo", value=False,
+            help="给参观用，真实收作业不要勾。每一行都带模拟标记，看板会整屏挂「模拟数据，非真实课堂」的牌子；"
                  "布置表里这个标记随时可改，关掉只是停止写入，不动已经交上来的东西。")
     with form_d:
         st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
@@ -1904,6 +1904,17 @@ def _render_roster_panel() -> None:
                 "未配置教师码（Secrets 或环境变量 ``TEACHER_GATE``），名单默认不公开。"
                 "加入码是学生取回自己报告的唯一凭据，而访问密码全班共用，所以这一屏"
                 "单独设一道门。"
+            )
+            return
+        if gate == _configured_password():
+            # 同值等于没有门：访问密码全班共用，知道网址的人可以直接开名单屏，
+            # 再逐个试那串 8 位加入码取别人的报告。这里不回显任何一个值。
+            st.session_state.pop("teacher_unlocked", None)
+            st.error(
+                "教师码与访问密码是同一个值，名单屏已锁住。这两项必须不同：访问密码是全班共用的，"
+                "两者相同就等于任何登录进来的人都能打开名单。请在 Cloud Secrets 里把 "
+                "``TEACHER_GATE`` 改成另一个值（改 Secrets 会重启应用，名单库随之清空，"
+                "所以要在开工之前改）。"
             )
             return
         if st.session_state.get("teacher_unlocked") is not True:
