@@ -1437,6 +1437,290 @@ def _render_challenge_board(runs: list[dict]) -> None:
                 challenges.steps(challenge), challenge["seed"]))
 
 
+def _toggle_detail_run(code: str) -> None:
+    """把「就地展开的那一份」换成这一份；再点同一条就是收起。
+
+    用按钮而不是带状态的 expander：几十条 nested expander 的展开状态在重跑时会被丢掉，
+    老师看到的是标题开了、里面空白的一份。按钮走 ``session_state``，点下去必然重跑。
+    """
+    st.session_state["detail_run"] = "" if st.session_state.get("detail_run") == code else code
+
+
+def _render_run_detail(run: dict) -> None:
+    """一份提交的逐轮详情：就地按决策串重放，不写 ``session_state``。
+
+    老师要看的是「这个人在第 3 局第 5 轮面对的到底是什么」。库里从来只存决策串，
+    所以下面这些表、上面那张榜、以及学生自己那份报告，是同一串决策在**同一条引擎路径**
+    上重放出来的三个视图——三边对不上是结构上不可能的事，而不是靠约定同步。
+
+    只渲染被点开的那一份：几十份 × 每份几十轮一起写进页面，会让这一屏每点一下卡一次。
+    """
+    challenge = _resolve_challenge(run["challenge_id"]) if run["challenge_id"] else None
+    if run["challenge_id"] and challenge is None:
+        st.caption(
+            "这份提交挂的挑战码 {} 不在题面表里，重放不出对手集合，所以逐轮也画不出来。"
+            "导入挑战表 CSV 就能恢复它。".format(run["challenge_id"]))
+        return
+    setup, codes, matches, _, runner = _replay_matches(
+        run["count"], run["turns"], run["seed"], run["actions"],
+        challenge=challenge, predictions=run["predictions"] or None)
+
+    st.caption(
+        "题面：{} 局 × 每局 {} 轮 = {} 步，种子 {}。对手依次是 {}。"
+        "下面每一张表都是按库里那串决策当场重放的，不是存下来的报告。".format(
+            setup["count"], setup["turns"], setup["count"] * setup["turns"],
+            setup["seed"], "、".join(codes)))
+    if not matches and runner is None:
+        st.caption("这一份一份决策都没留下。")
+        return
+    for match in matches:
+        gap = match.player_score - match.opponent_score
+        st.markdown("**第 {} 局 · 对手 {}（{}）**　{:g} : {:g}　{}".format(
+            match.index + 1, match.opponent, match.opponent_label,
+            match.player_score, match.opponent_score,
+            "领先" if gap > 0 else ("落后" if gap < 0 else "持平")))
+        st.markdown(
+            history_table(
+                match.player_actions, match.opponent_actions,
+                turns=match.turns, decisions=match.decisions),
+            unsafe_allow_html=True,
+        )
+    if runner is not None:
+        played = "".join(item.action for item in runner.decisions)
+        theirs = "".join(item.opponent_action for item in runner.decisions)
+        st.markdown("**第 {} 局 · 对手 {}（{}）· 停在第 {} 轮**".format(
+            runner.index + 1, runner.opponent, runner.opponent_label, len(played)))
+        st.markdown(
+            history_table(played, theirs, decisions=runner.decisions),
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "这一局没打完（学生关了页面），所以它不进上面那张榜；下面那些读数也只数"
+            "打完的那些局。")
+    if not matches:
+        return
+    profile = build_profile(matches)
+    _render_theory_readings(profile)
+
+    stats = _prediction_stats(matches)
+    if stats is None:
+        st.caption("这一份没有留下任何一次猜测：这个学生没开「每轮先猜对手出什么」。")
+        return
+    st.markdown("**预测命中率**")
+    rate_col, base_col, align_col = st.columns(3)
+    rate_col.metric(
+        "命中率", "{:.0%}".format(stats["hits"] / max(stats["guesses"], 1)),
+        help="猜中的轮数 ÷ 猜过的轮数；跳过的轮不进分母。")
+    base_col.metric(
+        "不猜的参照线",
+        "{:.0%}".format(stats["blank_hits"] / max(stats["guesses"], 1)),
+        help="每轮都猜对手在这一局出得更多的那一手能中的比例。高过它才说明猜测带进了信息。")
+    align_col.metric(
+        "信念与出手一致",
+        "{:.0%}".format(stats["aligned"] / max(stats["guesses"], 1)),
+        help="猜它合作的那些轮里自己是否也出了合作；与猜得准不准无关。")
+    st.caption(
+        "猜过 {} 轮，其余 {} 轮直接出牌。".format(
+            stats["guesses"], max(profile["total_turns"] - stats["guesses"], 0)))
+    st.dataframe(stats["rows"], width="stretch", hide_index=True)
+
+
+def _challenge_choices() -> list[tuple[str, str]]:
+    """``(挑战码, 一行说明)`` for every题面 the teacher can hand out."""
+    options = [
+        (item["challenge_id"], "{} · {} 局 × {} 轮".format(
+            item["title"], len(item["codes"]), item["turns"]))
+        for item in challenges.PRESETS
+    ]
+    try:
+        own = store.list_challenges()
+    except (sqlite3.Error, OSError):
+        own = []
+    options += [
+        (item["challenge_id"], "{} · {} · {} 局 × {} 轮".format(
+            item["title"], item["challenge_id"], len(item["codes"]), item["turns"]))
+        for item in own
+    ]
+    return options
+
+
+def _render_assignment_desk(runs: list[dict], default_class: str) -> None:
+    """布置：把一道题发给一个班，并盯这个班交到哪儿了。
+
+    为什么单独一张表而不是在挑战行上写班级码：同一份题面要发给好几个班，而两个班的
+    分数必须是可比的——可比的前提就是它们打的是同一套对手。把挑战按班复制一份，题面
+    看起来一样，挑战码却变成两个，榜单也随之裂成两张再没人能对得上。
+
+    「演示：每刷新一次交一批」只改这张布置表里的一个标记。它不会动任何已有的提交，
+    关掉了就停止写入，随时可以再打开。
+    """
+    st.markdown("**布置一份挑战给某个班**")
+    st.caption(
+        "同一道题可以布置给好几个班：它们共用一张榜，所以「两个班谁高」是有意义的那种高。"
+        "布置本身不含任何学生信息，只有一个班级码。")
+    choices = _challenge_choices()
+    if not choices:
+        st.caption("还没有可布置的题面：先在上面的「自己编一份题面」里存一份。")
+        return
+    label_of = dict(choices)
+    form_a, form_b = st.columns([5, 4], gap="small")
+    with form_a:
+        picked = st.selectbox(
+            "题面", [code for code, _ in choices],
+            format_func=lambda code: label_of[code], key="assign_pick",
+            help="挑战码决定对手集合、轮数与种子：这三个一样，分数才可比。")
+    with form_b:
+        klass = st.text_input(
+            "班级码", value="" if default_class == "全部班级" else default_class,
+            key="assign_class", max_chars=24,
+            help="老师自己起的字符串。上面看板正在筛哪个班，这里就默认填哪个。")
+    form_c, form_d = st.columns([6, 3], gap="small")
+    with form_c:
+        demo_fill = st.checkbox(
+            "演示：每点一次「刷新名单」收一批虚拟提交", key="assign_demo", value=True,
+            help="给参观用。每一行都带模拟标记，看板会整屏挂「模拟数据，非真实课堂」的牌子；"
+                 "布置表里这个标记随时可改，关掉只是停止写入，不动已经交上来的东西。")
+    with form_d:
+        st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
+        if st.button("布置这个班", type="primary", width="stretch", key="assign_go"):
+            try:
+                store.assign_challenge(
+                    picked, klass, note="", demo_fill=demo_fill)
+            except (ValueError, sqlite3.Error, OSError) as error:
+                st.session_state["assign_echo"] = "没能布置：{}".format(error)
+            else:
+                st.session_state["assign_echo"] = "已布置：{} → {}".format(
+                    label_of[picked], klass.strip())
+            st.rerun()
+
+    echo = st.session_state.pop("assign_echo", "")
+    if echo:
+        (st.success if echo.startswith("已布置") else st.error)(echo)
+
+    try:
+        made = store.list_assignments()
+    except (sqlite3.Error, OSError) as error:
+        st.warning("布置表读不出来：{}".format(error))
+        return
+    if not made:
+        st.caption("还没有布置记录。学生凭链接也能打，布置这一层只是为了看「谁该交、交没交」。")
+        return
+    st.markdown("**已布置 {} 条**".format(len(made)))
+    tally: dict[tuple[str, str], list[dict]] = {}
+    for run in runs:
+        if run["challenge_id"]:
+            tally.setdefault(
+                (run["challenge_id"], run["class_code"]), []).append(run)
+    for item in made:
+        group = tally.get((item["challenge_id"], item["class_code"]), [])
+        finished = sum(1 for run in group if run["status"] == "finished")
+        challenge = _resolve_challenge(item["challenge_id"])
+        title = challenge["title"] if challenge else item["challenge_id"]
+        info_col, link_col, off_col = st.columns([6, 5, 1], gap="small")
+        with info_col:
+            filled = "{} / {}".format(len(group), demo_roster.PER_CLASS) \
+                if item["demo_fill"] else "{}".format(len(group))
+            st.markdown(
+                "<div style='padding:.2rem 0'><b>{}</b> → <b>{}</b>"
+                "<div style='font-size:.78rem;color:{}'>已交 {} · 打完 {} · "
+                "第 {} 批{}</div></div>".format(
+                    title, item["class_code"], theme.FAINT, filled, finished,
+                    item["demo_round"],
+                    "　<span style='color:{}'>模拟上交</span>".format(theme.DEFECT)
+                    if item["demo_fill"] else ""),
+                unsafe_allow_html=True,
+            )
+        with link_col:
+            st.text_input(
+                "链接", value=_task_link(item["challenge_id"]),
+                key="assign_link_{}_{}".format(
+                    item["challenge_id"], item["class_code"]),
+                label_visibility="collapsed",
+                help="把这条发给这个班的人：点开就已经锁好题面。")
+        with off_col:
+            if st.button("✕", key="unassign_{}_{}".format(
+                    item["challenge_id"], item["class_code"]),
+                    help="停止布置：已经交上来的提交一份都不动。"):
+                try:
+                    store.unassign(item["challenge_id"], item["class_code"])
+                except (sqlite3.Error, OSError) as error:
+                    st.session_state["assign_echo"] = "没能取消：{}".format(error)
+                else:
+                    st.session_state["assign_echo"] = "已取消布置。"
+                st.rerun()
+
+
+def _collect_homework() -> None:
+    """刷新名单：对每一条开了演示的布置收一批虚拟提交。
+
+    一条布置一次只写 ``demo_roster.BATCH`` 份，并且按布置表里的批次号往下走，所以
+    「刷新一次收一部分」是接着上一次交，不是把同一批人重交一遍。某个班交完之后再来
+    就是 0 份，这一句会照实写在回显里，而不是假装又收上了一批。
+
+    中途报错时前面那几条已经落库了（每条各自提交），回显会说明这一点：演示数据最坏的
+    用法就是让人分不清到底写没写进去。
+    """
+    lines: list[str] = []
+    failed = ""
+    try:
+        made = store.list_assignments()
+    except (sqlite3.Error, OSError) as error:
+        st.session_state["homework_echo"] = "名单读不出来：{}".format(error)
+        return
+    for item in made:
+        if not item["demo_fill"]:
+            continue
+        challenge = _resolve_challenge(item["challenge_id"])
+        if challenge is None:
+            lines.append("布置 {} → {} 的题面找不到了，先导入挑战表 CSV。".format(
+                item["challenge_id"], item["class_code"]))
+            continue
+        try:
+            index = store.advance_assignment(
+                item["challenge_id"], item["class_code"])
+            written = demo_roster.submit_batch(
+                challenge, item["class_code"], index)
+        except (ValueError, RuntimeError, sqlite3.Error, OSError) as error:
+            failed = str(error)
+            break
+        if written:
+            lines.append("{} → {}：第 {} 批收了 {} 份（模拟）。".format(
+                challenge["title"], item["class_code"], index, written))
+        else:
+            lines.append("{} → {}：这个班的名单已经交完，这次没有新提交。".format(
+                challenge["title"], item["class_code"]))
+    if not lines:
+        st.session_state["homework_echo"] = (
+            "没有可收的布置：勾上「演示：每点一次刷新收一批」的那几条才会交上来。"
+            if not failed else "没能收上来：{}".format(failed))
+        return
+    if failed:
+        lines.append("后面几条没能收上来：{}（上面这些已经落库）。".format(failed))
+    st.session_state["homework_echo"] = "　|　".join(lines)
+
+
+def _render_homework_bar() -> None:
+    """收作业那一钮，放在整块看板之上：按它一下，下面所有数字都是新名单算出来的。"""
+    hint_col, button_col = st.columns([8, 3], gap="small", vertical_alignment="bottom")
+    with hint_col:
+        echo = st.session_state.pop("homework_echo", "")
+        if echo.startswith("没能") or echo.startswith("名单"):
+            st.error(echo)
+        elif echo:
+            st.success("已刷新名单。" + echo)
+        else:
+            st.caption(
+                "这份名单是每次进这一屏现读的。开了演示的布置，点一次刷新就多收一批虚拟"
+                "提交（每一行都带模拟标记，导出的 CSV 里 ``demo=1``）；真实提交不受这个"
+                "按钮影响，它只会被读出来。")
+    with button_col:
+        if st.button("刷新名单（收作业）", type="primary", width="stretch",
+                     key="homework_refresh",
+                     help="重读名单库，并对每一条开了「演示上交」的布置按批次收一批虚拟提交。"):
+            _collect_homework()
+            st.rerun()
+
+
 def _render_issue_desk() -> None:
     """下发：预置挑战的链接，和老师自己编的一份挑战。"""
     st.markdown("**下发一份挑战**")
@@ -1645,14 +1929,19 @@ def _render_roster_panel() -> None:
             ),
             unsafe_allow_html=True,
         )
+        _render_homework_bar()
         _render_issue_desk()
-        _render_demo_desk()
 
         try:
             runs = store.list_runs()
         except (sqlite3.Error, OSError) as error:
             st.warning("名单库暂时读不出来：{}".format(error))
             return
+
+        # 布置那一块要看名单，所以读库在它前面；刷新按钮重跑整屏，两边不会读到不同版本。
+        _render_assignment_desk(
+            runs, st.session_state.get("board_class", "全部班级"))
+        _render_demo_desk()
 
         if not runs:
             st.caption("名单库还是空的。学生开始一局后这里就会有记录；"
@@ -1669,27 +1958,39 @@ def _render_roster_panel() -> None:
             _render_demo_notice(shown)
             _render_board_summary(shown)
             _render_challenge_board(shown)
-            with st.expander("逐份提交（加入码原样列出）", expanded=False):
+            with st.expander("逐份提交与逐轮详情（加入码原样列出）", expanded=False):
                 st.caption(
-                    "这一张表里只有码、题面参数和决策串。九项测量与比分都不在库里，"
-                    "拿到这行数据的人要重算才有——所以它不是一份档案。")
-                st.dataframe(
-                    [
-                        {
-                            "加入码": run["join_code"],
-                            "班级码": run["class_code"] or "—",
-                            "来源": "模拟" if run.get("demo") else "真实",
-                            "挑战码": run["challenge_id"] or "—",
-                            "状态": "已完成" if run["status"] == "finished" else "进行中",
-                            "局数": run["count"],
-                            "每局轮数": run["turns"],
-                            "已打决策": sum(len(a) for a in run["actions"]),
-                            "更新时间": run["updated_at"],
-                        }
-                        for run in shown
-                    ],
-                    width="stretch", hide_index=True,
-                )
+                    "每一行只有码、题面参数和决策串。九项测量与比分都不在库里，拿到这行"
+                    "数据的人要重算才有——所以它不是一份档案。\n\n"
+                    "点「看逐轮详情」就地重放那一份，一次只展开一份：几十份一起重放会让"
+                    "这一屏每点一下都卡一次。")
+                detail_run = st.session_state.get("detail_run", "")
+                for run in shown:
+                    code = run["join_code"]
+                    info, act = st.columns([9, 2], vertical_alignment="center")
+                    with info:
+                        st.markdown(
+                            "**{}** · {} · 已打 {} 步 · {} · {}".format(
+                                code,
+                                run["class_code"] or "无班级码",
+                                sum(len(a) for a in run["actions"]),
+                                "已完成" if run["status"] == "finished" else "进行中",
+                                "模拟" if run.get("demo") else "真实",
+                            ))
+                    with act:
+                        st.button(
+                            "收起逐轮详情" if code == detail_run else "看逐轮详情",
+                            key="detail_toggle_{}".format(code),
+                            on_click=_toggle_detail_run, args=(code,),
+                            width="stretch")
+                    if code != detail_run:
+                        continue
+                    st.caption(
+                        "来源：{} · 挑战码 {} · {} 局 × 每局 {} 轮 · 更新于 {}".format(
+                            "模拟" if run.get("demo") else "真实",
+                            run["challenge_id"] or "自由对局",
+                            run["count"], run["turns"], run["updated_at"]))
+                    _render_run_detail(run)
 
         out_col, in_col = st.columns(2)
         with out_col:
@@ -1743,6 +2044,38 @@ def _render_roster_panel() -> None:
                 else:
                     st.success(
                         "已恢复 {} 份题面。学生手里的挑战码重新可用，榜单也能重放了。".format(saved))
+
+        # 第三份备份。名单里的 challenge_id 说的只是题面，「哪道题发给哪个班」和
+        # 「演示上交到第几批」都在布置表里：少了它，榜照常能算，但每一条虚拟上交会从
+        # 第 1 批重来——于是同一批虚拟学生被交两遍，而这一屏看不出差别。
+        fill_out, fill_in = st.columns(2)
+        with fill_out:
+            try:
+                payload = store.export_assignments_csv()
+                problem = ""
+            except (sqlite3.Error, OSError) as error:
+                payload = b""
+                problem = str(error)
+            st.download_button(
+                "⬇ 导出布置表 CSV",
+                data=payload,
+                file_name="fittest-assignments.csv",
+                mime="text/csv",
+                width="stretch",
+                disabled=not payload,
+                help=problem or "哪道题发给了哪个班、演示上交到第几批，都在这张表里。",
+            )
+        with fill_in:
+            fill_upload = st.file_uploader(
+                "上传此前导出的布置表 CSV", type="csv", key="assignment_csv")
+            if fill_upload is not None and st.button("恢复这批布置", key="assignment_import"):
+                try:
+                    restored = store.import_assignments_csv(fill_upload.getvalue())
+                except (ValueError, sqlite3.Error, OSError) as error:
+                    st.error("导入失败：{}".format(error))
+                else:
+                    st.success(
+                        "已恢复 {} 条布置。虚拟上交会接着原来的批次号往下走。".format(restored))
 
 
 def render_mode_select() -> None:
@@ -2212,18 +2545,14 @@ def _game_payload() -> str | None:
     )
 
 
-def _replay_run(count: int, turns: int, seed: int, acts: list[str], *,
-                join_code: str | None = None,
-                challenge: dict | None = None,
-                predictions: list[str] | None = None) -> None:
-    """从"设置 + 玩家决策"重放出一局，填好 session_state。
+def _replay_matches(count: int, turns: int, seed: int, acts: list[str], *,
+                    challenge: dict | None = None,
+                    predictions: list[str] | None = None):
+    """把"设置 + 玩家决策"重放成 ``(题面参数, 对手编码, 打完的局, 每局摘要, 未完局)``。
 
-    地址栏恢复和加入码恢复共用它：确定性的引擎意味着只要喂回同样的种子和同样
-    的决策，重放出来的对手、比分与九项测量必然和原局一致——所以存的从来不是
-    报告，而是产生报告的那几步选择。
-
-    ``challenge`` 是挑战局的情形：对手集合由挑战给定（不再是种子的函数），所以
-    载荷里只留决策。计数以挑战为准，避免"题面 6 个对手、榜上按 10 个算"。
+    纯函数：不碰 ``session_state``。地址栏恢复用它再填状态，教师端看单个学生的逐轮
+    用它直接拿 ``Match`` 对象。两边必须走同一条路径，否则「老师点开的这一份」和
+    「学生自己看到的报告」会悄悄长得不一样，而没有任何一处会报错。
     """
     if challenge is not None:
         codes = list(challenge["codes"])
@@ -2256,9 +2585,27 @@ def _replay_run(count: int, turns: int, seed: int, acts: list[str], *,
             # 这一局还没打完：恢复成正在进行的对局。
             runner = match_runner
             break
+    return {"count": count, "turns": turns, "seed": seed}, codes, matches, done, runner
+
+
+def _replay_run(count: int, turns: int, seed: int, acts: list[str], *,
+                join_code: str | None = None,
+                challenge: dict | None = None,
+                predictions: list[str] | None = None) -> None:
+    """从"设置 + 玩家决策"重放出一局，填好 session_state。
+
+    地址栏恢复和加入码恢复共用它：确定性的引擎意味着只要喂回同样的种子和同样
+    的决策，重放出来的对手、比分与九项测量必然和原局一致——所以存的从来不是
+    报告，而是产生报告的那几步选择。
+
+    ``challenge`` 是挑战局的情形：对手集合由挑战给定（不再是种子的函数），所以
+    载荷里只留决策。计数以挑战为准，避免"题面 6 个对手、榜上按 10 个算"。
+    """
+    setup, codes, matches, done, runner = _replay_matches(
+        count, turns, seed, acts, challenge=challenge, predictions=predictions)
 
     st.session_state[GAME_SETUP_KEY] = {
-        "count": count, "turns": turns, "seed": seed,
+        "count": setup["count"], "turns": setup["turns"], "seed": setup["seed"],
         # 猜牌那一屏要不要出来，跟着"这一局有没有留下猜测"走：库里那段串存在，
         # 说明学生开过这个开关，刷新之后不该莫名其妙关掉它。
         "predict": bool(predictions),

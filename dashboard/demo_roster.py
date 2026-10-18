@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import random
 
 from strategy_engine.strategy_engine import StrategyState, parse_strategy
@@ -54,6 +55,14 @@ ARCHETYPES: tuple[tuple[str, int], ...] = (
 #: 猜测那一栏的三种「信念」：读上一手、默认合作、默认背叛。
 #: 它们是被猜的策略，不是被评价的人。
 GUESS_STYLES = ("last", "always_c", "always_d")
+
+#: 布置之后每刷新一次交上来的份数。一个真实班级不会在老师点刷新那一秒全班交完，
+#: 所以按批放；``BATCH`` 就是「一批大约多少人」，不是「一共多少人」。
+BATCH = 7
+
+#: 一道题 × 一个班最多收几批。名单本身只有 :data:`PER_CLASS` 人，交完之后刷新
+#: 返回 0；这个上限只是再兜一层，让演示数据不会随着手痒连点无限长大。
+MAX_ROUNDS = 6
 
 
 def _students(rng: random.Random) -> list[str]:
@@ -234,6 +243,90 @@ def load(seed: int = SEED, classes: tuple[str, ...] = CLASSES) -> int:
             predictions=row["predictions"] or None,
         )
     return len(rows)
+
+
+def _key(*parts: object) -> int:
+    """A stream keyed to a (班级, 挑战, 批次) triple.
+
+    ``str`` hashing is salted per process, so the class codes and challenge ids
+    have to be digested rather than handed to :func:`hash`; otherwise the same
+    refresh on a different day would fabricate a different batch of students.
+    """
+    joined = "|".join(str(part) for part in parts)
+    digest = hashlib.sha256(joined.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big")
+
+
+def roster(class_code: str, seed: int = SEED) -> list[str]:
+    """One class's simulated students, in a stable order.
+
+    Order is the whole point: refresh N has to be the N-th slice of this same
+    list, not a fresh draw, or the second batch would be a different set of
+    people handing in a题面 the first batch already submitted.
+    """
+    return _students(random.Random(_key("roster", seed, class_code)))
+
+
+def batch_plan(class_code: str, round_index: int, seed: int = SEED) -> list[str]:
+    """The encodings that hand in during ``round_index``; empty once交完了."""
+    if not 1 <= round_index <= MAX_ROUNDS:
+        return []
+    start = (round_index - 1) * BATCH
+    return roster(class_code, seed)[start:start + BATCH]
+
+
+def submit_batch(
+    challenge: dict, class_code: str, round_index: int, seed: int = SEED,
+) -> int:
+    """Write one refresh's worth of hand-ins for an assigned题面.
+
+    「刷新一次收一部分」走的是这条：第 ``round_index`` 批是这个班固定名单里的第
+    ``(r-1) * BATCH`` 到 ``r * BATCH`` 个人，所以刷新是接着上一次往下走，而不是把
+    同一批人重交一遍；名单交完以后再刷新就是 0 份，教师端据此回显「这次没有新提交」。
+
+    写进去的每一行和 :func:`build`、和一份真实提交走的是同一套东西：同一批策略编码、
+    同一个 :class:`~dashboard.gameplay.PlayerMatchRunner`、同一个
+    :func:`store.create_run` / :func:`store.save_progress`，并且一律 ``demo=True``。
+    """
+    picked = batch_plan(class_code, round_index, seed)
+    if not picked:
+        return 0
+    codes = _join_codes(
+        len(picked),
+        _key("codes", seed, class_code, challenge["challenge_id"], round_index),
+    )
+    start = (round_index - 1) * BATCH
+    for offset, encoding in enumerate(picked):
+        rng = random.Random(_key("student", seed, class_code, start + offset))
+        noise = rng.choice([0.0, 0.05, 0.1, 0.15, 0.25])
+        guess_style = rng.choice(GUESS_STYLES) if rng.random() < 0.55 else None
+        guess_rate = rng.choice([0.5, 0.8, 1.0])
+        actions: list[str] = []
+        predictions: list[str] = []
+        for index, code in enumerate(challenge["codes"]):
+            played, guessed = _match(
+                index, code, challenge["turns"], challenge["seed"],
+                encoding, rng, noise, guess_style, guess_rate)
+            actions.append(played)
+            predictions.append(guessed)
+        status = "finished"
+        if rng.random() < 0.1:
+            # 一个班总有人关了标签页：最后一局只打几轮，榜会把他跳过。
+            actions[-1] = actions[-1][: max(1, len(actions[-1]) // 2)]
+            predictions[-1] = predictions[-1][:len(actions[-1])]
+            status = "playing"
+        join_code = codes[offset]
+        store.create_run(
+            join_code, class_code=class_code, opponent_count=len(challenge["codes"]),
+            turns=challenge["turns"], seed=challenge["seed"],
+            engine_version=ENGINE_VERSION, tutorial_done=True,
+            challenge_id=challenge["challenge_id"], demo=True,
+        )
+        store.save_progress(
+            join_code, actions=actions, tutorial_done=True, status=status,
+            predictions=predictions if guess_style else None,
+        )
+    return len(picked)
 
 
 def clear() -> int:

@@ -36,6 +36,10 @@ Deployment: Streamlit Cloud's free tier has an ephemeral filesystem, so this
 database is reset on a redeploy. :func:`export_csv` and :func:`import_csv` exist
 for exactly that reason -- the teacher downloads the whole table at the end of
 the lesson and can put it back. See docs/deployment.md.
+
+A third table, ``assignments``, records "this题面 is homework for that class". It
+holds a challenge code, a class label, a note the teacher typed and the演示
+sequence counter -- again nothing about a person.
 """
 
 from __future__ import annotations
@@ -66,6 +70,11 @@ CHALLENGE_COLUMNS = [
     "note", "created_at",
 ]
 
+ASSIGNMENT_COLUMNS = [
+    "challenge_id", "class_code", "note", "demo_fill", "demo_round",
+    "created_at", "updated_at",
+]
+
 SCHEMA_TABLES = """
 CREATE TABLE IF NOT EXISTS runs (
     join_code      TEXT PRIMARY KEY,
@@ -93,6 +102,16 @@ CREATE TABLE IF NOT EXISTS challenges (
     note         TEXT NOT NULL DEFAULT '',
     created_at   TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS assignments (
+    challenge_id TEXT NOT NULL,
+    class_code   TEXT NOT NULL,
+    note         TEXT NOT NULL DEFAULT '',
+    demo_fill    INTEGER NOT NULL DEFAULT 0,
+    demo_round   INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (challenge_id, class_code)
+);
 """
 
 #: Split out of the table statements on purpose. An index cannot be built on a
@@ -103,6 +122,7 @@ SCHEMA_INDEXES = """
 CREATE INDEX IF NOT EXISTS runs_class ON runs (class_code);
 CREATE INDEX IF NOT EXISTS runs_challenge ON runs (challenge_id);
 CREATE INDEX IF NOT EXISTS challenges_class ON challenges (class_code);
+CREATE INDEX IF NOT EXISTS assignments_class ON assignments (class_code);
 """
 
 #: Rows written before :mod:`dashboard.challenges` existed have no
@@ -466,6 +486,162 @@ def import_challenges_csv(data: bytes) -> int:
                     int(record.get("seed") or 0),
                     (record.get("note") or "").strip()[:120],
                     record.get("created_at") or _now(),
+                ),
+            )
+            count += 1
+    return count
+
+
+# --- Assignments ----------------------------------------------------------
+#
+# An assignment is "this fixed题面 is homework for that class". It is its own
+# table rather than a ``class_code`` on the challenge because one题面 is handed
+# to several classes at once, and the whole point of a challenge is that its
+# ranking groups everyone who played *the same* opponents, turns and seed.
+# Copying a challenge per class would split one题面 into several unrelated boards
+# and quietly destroy the comparison.
+#
+# ``demo_round`` belongs to the演示 path only: it records how many batches of
+# scripted submissions have already been written for this assignment, so the next
+# refresh continues the sequence instead of re-submitting the same students.
+
+
+def _as_assignment(row: sqlite3.Row) -> dict:
+    return {
+        "challenge_id": row["challenge_id"],
+        "class_code": row["class_code"],
+        "note": row["note"],
+        "demo_fill": bool(row["demo_fill"]),
+        "demo_round": int(row["demo_round"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def assign_challenge(challenge_id: str, class_code: str, note: str = "",
+                     demo_fill: bool = False) -> dict:
+    """Assign one题面 to one class. Re-assigning updates it and keeps its history.
+
+    ``created_at`` and ``demo_round`` survive a re-assign on purpose: the teacher
+    who edits the note or flips the演示 switch must not rewind the submissions
+    already written under this assignment, or the next refresh would fabricate a
+    batch that is already in the roster.
+    """
+    code = normalize_code(challenge_id)
+    klass = (class_code or "").strip()[:24]
+    if not code:
+        raise ValueError("布置需要一道题：先选一份挑战。")
+    if not klass:
+        raise ValueError("布置需要班级码：不然这份作业没有「谁该交」。")
+    now = _now()
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT created_at, demo_round FROM assignments"
+            " WHERE challenge_id = ? AND class_code = ?",
+            (code, klass),
+        ).fetchone()
+        created = row["created_at"] if row else now
+        round_index = int(row["demo_round"]) if row else 0
+        connection.execute(
+            "INSERT OR REPLACE INTO assignments (challenge_id, class_code, note,"
+            " demo_fill, demo_round, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (code, klass, (note or "").strip()[:120], int(bool(demo_fill)),
+             round_index, created, now),
+        )
+    return {
+        "challenge_id": code, "class_code": klass,
+        "note": (note or "").strip()[:120], "demo_fill": bool(demo_fill),
+        "demo_round": round_index, "created_at": created, "updated_at": now,
+    }
+
+
+def list_assignments(class_code: str | None = None) -> list[dict]:
+    """Every布置, newest first; ``class_code`` filters to one class."""
+    query = "SELECT * FROM assignments"
+    args: list[str] = []
+    if class_code:
+        query += " WHERE class_code = ?"
+        args.append(class_code.strip())
+    query += " ORDER BY updated_at DESC"
+    with connect() as connection:
+        return [_as_assignment(row) for row in connection.execute(query, args)]
+
+
+def advance_assignment(challenge_id: str, class_code: str) -> int:
+    """Count one more演示 batch against this布置 and return the new index."""
+    code = normalize_code(challenge_id)
+    klass = (class_code or "").strip()[:24]
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT demo_round FROM assignments"
+            " WHERE challenge_id = ? AND class_code = ?",
+            (code, klass),
+        ).fetchone()
+        if row is None:
+            raise ValueError("这份布置已经不在了：{}".format(code))
+        round_index = int(row["demo_round"]) + 1
+        connection.execute(
+            "UPDATE assignments SET demo_round = ?, updated_at = ?"
+            " WHERE challenge_id = ? AND class_code = ?",
+            (round_index, _now(), code, klass),
+        )
+    return round_index
+
+
+def unassign(challenge_id: str, class_code: str) -> bool:
+    """Stop assigning. Submissions already made stay -- they are the作业."""
+    with connect() as connection:
+        cursor = connection.execute(
+            "DELETE FROM assignments WHERE challenge_id = ? AND class_code = ?",
+            (normalize_code(challenge_id), (class_code or "").strip()[:24]),
+        )
+    return cursor.rowcount > 0
+
+
+def export_assignments_csv() -> bytes:
+    """The布置表 as CSV -- the third file a pre-redeploy backup needs.
+
+    Without it a restored roster still has ``challenge_id`` on every submission,
+    so the boards rebuild, but the teacher loses which题面 was assigned to which
+    class and every演示 sequence restarts from round 0.
+    """
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=ASSIGNMENT_COLUMNS)
+    writer.writeheader()
+    with connect() as connection:
+        for row in connection.execute(
+                "SELECT * FROM assignments ORDER BY created_at"):
+            record = dict(row)
+            record["demo_fill"] = "1" if record["demo_fill"] else "0"
+            writer.writerow({name: record[name] for name in ASSIGNMENT_COLUMNS})
+    return buffer.getvalue().encode("utf-8-sig")
+
+
+def import_assignments_csv(data: bytes) -> int:
+    """Restore布置 rows exported by :func:`export_assignments_csv`."""
+    text = data.decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(text, newline=""))
+    if not reader.fieldnames or "challenge_id" not in reader.fieldnames:
+        raise ValueError("这份 CSV 缺少 challenge_id 列，不像是本站导出的布置表。")
+    count = 0
+    with connect() as connection:
+        for record in reader:
+            code = normalize_code(record.get("challenge_id") or "")
+            klass = (record.get("class_code") or "").strip()[:24]
+            if not code or not klass:
+                continue
+            connection.execute(
+                "INSERT OR REPLACE INTO assignments (challenge_id, class_code,"
+                " note, demo_fill, demo_round, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    code, klass,
+                    (record.get("note") or "").strip()[:120],
+                    int((record.get("demo_fill") or "0").strip() == "1"),
+                    int(record.get("demo_round") or 0),
+                    record.get("created_at") or _now(),
+                    record.get("updated_at") or _now(),
                 ),
             )
             count += 1
