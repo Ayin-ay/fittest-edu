@@ -1274,10 +1274,10 @@ LANDING_MODES = [
         "subtitle": "与策略对局，然后看懂自己的选择",
         "bullets": [
             "五轮教学对局先把规则走一遍，随时可跳过",
-            "与 10 个行为各异的随机策略各战 10 轮，每步自己决定合作或背叛",
+            "报上班级码就打老师布置给你们班的那道题；没有布置就以游客身份自己定一局",
             "结束后拿到 11×11 得分热力图、九项维度得分与逐步解读报告",
         ],
-        "tags": ["约 8 分钟", "无需配置", "含解读报告"],
+        "tags": ["约 8 分钟", "支持班级榜", "含解读报告"],
         "badge": "推荐先玩",
         "cta": "进入游戏模式",
     },
@@ -2231,6 +2231,8 @@ _PAYLOAD_VERSION = "v1"
 _PAYLOAD_VERSION_TASK = "v2"
 #: 当前这一局是不是在打某个挑战；存的是解析出来的挑战字典。
 GAME_TASK_KEY = "game_challenge"
+#: 这一屏会话是不是选了「以游客身份进入」：游客只走自由局，不进任何班的榜。
+GAME_GUEST_KEY = "game_guest"
 #: 「挑战码」输入框。
 TASK_CODE_KEY = "task_code"
 #: 可选练习：每轮先猜对手出什么。开关本身不进载荷，只跟着这一局走。
@@ -2240,6 +2242,22 @@ PREDICT_KEY = "game_predict"
 #: 读者是在读到某一屏时才产生疑问的，把答案放在别处等于没有答案。
 #: 文案必须与代码实际行为一致：这里写的每一个数字、每一种颜色，都能在上面那屏找到。
 GAME_HELP = {
+    "class": [
+        ("这块在做什么",
+         "先认班，再选题。老师把某道题布置给某个班之后，这个班的人在这一屏"
+         "只会看到自己该交的那几道题，点开题面就能开始。"),
+        ("班级码是什么、不是什么",
+         "它是老师自己起的一串字（例如 计科231），只用来把同一批人的对局归到"
+         "一张榜上。它不是姓名、不是学号，本站也不收任何能指认到人的东西——"
+         "库里那一行只有这串码、一个随机加入码和你的决策串。"),
+        ("游客是什么",
+         "点「以游客身份进入」就是自由打一局：对手数量、轮数、种子自己定，"
+         "成绩页和那几项行为读数一样都有。只是这一局不挂在老师布置的那道题上，"
+         "也就不会进那道题的榜——讲评时对不上号。"),
+        ("学习目标",
+         "同一套对手、同一个种子，分数才是可比的。先确认题目再动手，"
+         "是这一局事后能被拿来当证据的前提。"),
+    ],
     "setup": [
         ("这块在做什么",
          "开局前的三个选择：对手数量、每局轮数、随机种子。默认 10 局 × 10 轮，"
@@ -2983,13 +3001,108 @@ def _render_challenge_setup(challenge: dict) -> None:
         st.rerun()
 
 
+def _render_task_code_fold() -> None:
+    """只有挑战码、没有班级码的人走这里：输码即锁题面。"""
+    with st.expander("老师下发了挑战码？", expanded=False):
+        st.caption(
+            "输入挑战码，题面（对手集合、每局轮数、种子）就替你锁定；这一局的"
+            "成绩才会和同批提交排在同一张榜上。码显示在老师那份页面上。")
+        task_col, btn_col = st.columns([3, 1], vertical_alignment="bottom")
+        with task_col:
+            task_input = st.text_input(
+                "挑战码", placeholder="例如 P-R1EC", key=TASK_CODE_KEY,
+                label_visibility="collapsed",
+            )
+        with btn_col:
+            if st.button("进入挑战", key="enter_task", width="stretch"):
+                resolved = _resolve_challenge(task_input or "")
+                if resolved is None:
+                    st.error(
+                        "查不到挑战码「{}」。核对有没有抄错——I、O、0、1 这四个"
+                        "字符不会出现在挑战码里。".format(
+                            store.normalize_code(task_input or "") or "（空）"))
+                else:
+                    st.session_state[GAME_TASK_KEY] = resolved
+                    st.rerun()
+
+
+def _assignments_for_class(class_code: str) -> list[dict]:
+    """这个班该交的题目。比对时忽略大小写与空格。
+
+    布置表里的班级码是老师原样敲进去的，学生重打一遍几乎必然差一个空格或一次
+    大小写。对不上会被读成「这个班没布置」——那比报错更糟，因为它把全班推到
+    游客局里去，交上来的东西不进任何榜，讲评时谁都看不见。
+    """
+    wanted = store.normalize_code(class_code or "")
+    if not wanted:
+        return []
+    try:
+        rows = store.list_assignments()
+    except (sqlite3.Error, OSError) as error:
+        st.session_state[STORE_ERROR_KEY] = str(error)
+        return []
+    return [row for row in rows
+            if store.normalize_code(row["class_code"]) == wanted]
+
+
+def _render_class_gate() -> None:
+    """教程之后的第一屏：报上班级码 → 看到本班的题 → 开局。
+
+    刻意不显示对手编码，也不在这里解释规则：这一屏只做一个决定——你是哪个班、
+    打哪道题。题面卡说清有多少步、什么生态，编码等一局打完再揭晓。
+    """
+    st.markdown(
+        theme.heading("第一步：你是哪个班？", 3, help_blocks=GAME_HELP["class"]),
+        unsafe_allow_html=True,
+    )
+    typed = st.text_input(
+        "班级码", placeholder="老师写在黑板上的那串，例如 计科231",
+        key=CLASS_CODE_KEY, max_chars=24,
+        help="把同一批人的对局归到一张榜上。它不是姓名也不是学号——本站不收集"
+             "任何能指认到人的东西，交上来的只有这串码、一个随机加入码和你的决策。",
+    ).strip()
+    if typed:
+        assigned = _assignments_for_class(typed)
+        if not assigned:
+            st.warning(
+                "班级码「{}」下老师还没有布置。核对有没有抄错；也可以直接输挑战码，"
+                "或者用下面的游客入口自由打一局。".format(typed))
+            _render_task_code_fold()
+        else:
+            st.caption("这个班有 {} 道布置。".format(len(assigned)))
+            for row in assigned:
+                challenge = _resolve_challenge(row["challenge_id"])
+                if challenge is None:
+                    st.error(
+                        "这份布置挂的挑战码「{}」在这里查不到（可能那份题面还没导入"
+                        "这个实例）。换一道，或向老师要一份链接。".format(
+                            row["challenge_id"]))
+                    continue
+                st.markdown(_challenge_card(challenge), unsafe_allow_html=True)
+                if row["note"]:
+                    st.caption("老师留的话：{}".format(row["note"]))
+                if st.button("开始这一局", type="primary", width="stretch",
+                             key="gate_go_{}".format(row["challenge_id"])):
+                    # 存老师敲的那一份，不存学生手抄的那一份：两者只差一个大小写时，
+                    # 看板上的班级筛选会裂成两个班，而它们其实是同一个班。
+                    _start_challenge(challenge, (row["class_code"] or typed)[:24])
+                    st.rerun()
+    _predict_toggle()
+    st.divider()
+    if st.button("以游客身份进入：自己定一局，不进老师布置的那张榜", key="gate_guest",
+                 width="stretch"):
+        st.session_state[GAME_GUEST_KEY] = True
+        st.session_state.pop(GAME_TASK_KEY, None)
+        st.rerun()
+
+
 def _render_game_setup() -> None:
     challenge = st.session_state.get(GAME_TASK_KEY)
     if challenge:
         _render_challenge_setup(challenge)
         return
     st.markdown(
-        theme.heading("第一步：设置这一局", 3, help_blocks=GAME_HELP["setup"]),
+        theme.heading("第二步：设置这一局", 3, help_blocks=GAME_HELP["setup"]),
         unsafe_allow_html=True,
     )
     count = st.slider("对手数量", 4, 12, 10, 1, key="game_opponents")
@@ -3038,30 +3151,6 @@ def _render_game_setup() -> None:
         }
         _game_start(count, turns, seed, class_code.strip()[:24])
         st.rerun()
-
-    # 挑战码收在滑块下面：绝大多数人是来自由打一局的，那三行选择是他们要做的决定；
-    # 而被下发了码的人只需要输一次码。
-    with st.expander("老师下发了挑战码？", expanded=False):
-        st.caption(
-            "输入挑战码，题面（对手集合、每局轮数、种子）就替你锁定；这一局的"
-            "成绩才会和同批提交排在同一张榜上。码显示在老师那份页面上。")
-        task_col, btn_col = st.columns([3, 1], vertical_alignment="bottom")
-        with task_col:
-            task_input = st.text_input(
-                "挑战码", placeholder="例如 P-R1EC", key=TASK_CODE_KEY,
-                label_visibility="collapsed",
-            )
-        with btn_col:
-            if st.button("进入挑战", key="enter_task", width="stretch"):
-                resolved = _resolve_challenge(task_input or "")
-                if resolved is None:
-                    st.error(
-                        "查不到挑战码「{}」。核对有没有抄错——I、O、0、1 这四个"
-                        "字符不会出现在挑战码里。".format(
-                            store.normalize_code(task_input or "") or "（空）"))
-                else:
-                    st.session_state[GAME_TASK_KEY] = resolved
-                    st.rerun()
 
 
 def _render_resume_box() -> None:
@@ -4239,7 +4328,7 @@ def render_game_mode() -> None:
                             GAME_MATCHES_KEY, GAME_DONE_KEY, GAME_RESULTS_KEY, GAME_PROFILE_KEY,
                             GAME_AI_KEY, GAME_TUTORIAL_KEY,
                             GAME_TUTORIAL_DONE, TUTORIAL_RUNNER_KEY, GAME_JOIN_KEY,
-                            "game_phase"):
+                            GAME_GUEST_KEY, "game_phase"):
                     st.session_state.pop(key, None)
                 st.session_state["app_mode"] = None
                 _clear_persisted_game()
@@ -4309,6 +4398,13 @@ def render_game_mode() -> None:
         # read every result wrong.
         if not st.session_state.get(GAME_TUTORIAL_DONE):
             _render_tutorial()
+            return
+        # 先报班级码，再看本班的题。少了这一道，学生只有两条路：在滑块里自由打一局
+        # （交上去不挂在老师那道题上），或者自己想起码来输——两条路都会让一部分人
+        # 悄悄落在班级榜外面，而讲评靠的正是那张榜。链接里已经带题面的跳过这一屏。
+        if (not st.session_state.get(GAME_TASK_KEY)
+                and not st.session_state.get(GAME_GUEST_KEY)):
+            _render_class_gate()
             return
         _render_game_setup()
 
